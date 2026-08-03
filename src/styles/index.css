@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-senior-light text-senior-dark;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1 {
+    @apply text-4xl font-bold mb-4;
+  }
+
+  h2 {
+    @apply text-3xl font-bold mb-3;
+  }
+
+  h3 {
+    @apply text-2xl font-bold mb-2;
+  }
+
+  button {
+    @apply focus:outline-none focus:ring-4 focus:ring-senior-accent;
+    transition: all 0.2s ease;
+  }
+
+  button:hover {
+    @apply scale-105;
+  }
+
+  button:active {
+    @apply scale-95;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-6 py-4 text-lg font-semibold rounded-lg transition-all;
+  }
+
+  .btn-primary {
+    @apply btn bg-senior-accent text-white hover:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-300 text-senior-dark hover:bg-gray-400;
+  }
+
+  .btn-success {
+    @apply btn bg-senior-success text-white hover:bg-green-700;
+  }
+
+  .btn-danger {
+    @apply btn bg-senior-error text-white hover:bg-red-700;
+  }
+
+  .card {
+    @apply bg-white p-6 rounded-lg shadow-md border-2 border-gray-200;
+  }
+
+  .card-header {
+    @apply text-2xl font-bold mb-4 pb-4 border-b-2 border-gray-200;
+  }
+
+  .input-field {
+    @apply w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-4 focus:ring-senior-accent mb-4;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto;
+  }
+
+  .accessibility-warning {
+    @apply fixed bottom-4 right-4 bg-yellow-100 border-2 border-senior-warning p-4 rounded-lg text-lg;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  body {
+    @apply bg-white text-black;
+  }
+
+  .card {
+    @apply border-4 border-black;
+  }
+
+  button {
+    @apply border-2 border-black;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
