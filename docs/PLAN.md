@@ -49,7 +49,7 @@ Everything else the current app does (chat, marketplace, working groups, damage 
 | Login | Logo, flat number, password, "show password". Stays logged in on the device |
 | Start | Info board first: next event with picture, further events, notices. Then three wide buttons to reserve, my reservations, contact block |
 | Räume | Pick a room, table or other thing, a day, the first and last hour (or "Ganzer Tag"), confirm |
-| Waschen | Same flow, pick the floor first. The app remembers the floor |
+| Waschen | Pick the floor and day, then set "Von" and "Bis" with two wheels (or arrow buttons). Shows what is already taken that day. The app remembers the floor |
 | Anlässe | List of events with picture, "Wir kommen" button. Admins add events with automatic room reservation and clash warning |
 | Verwalten (admins) | Add, edit, delete what can be reserved. Set admin email and WhatsApp link |
 
