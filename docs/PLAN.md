@@ -1,6 +1,16 @@
 # Oele51 Hausverein app: plan
 
-Status: draft for the Hausverein, 14 Nov 2026. Nothing here is decided yet.
+Status: draft for the Hausverein, 14 Nov 2026.
+
+## Decided (14 Nov 2026)
+
+- Admins can add, edit and remove anything that can be reserved
+- Reservations are flexible: from 1 hour up to the whole day
+- One login per flat
+- The app says "Du"
+- Only admins post notices on the info board
+- The info board opens the start page, with the next event first and a picture if there is one
+- Admin email and WhatsApp link do not exist yet. Admins enter them later in the app
 
 ## Goal
 
@@ -20,7 +30,7 @@ Everything else the current app does (chat, marketplace, working groups, damage 
 - Text at least 18 px, buttons at least 56 px high, strong contrast
 - Start page shows four large tiles and nothing hidden behind a menu
 - A bottom bar with icon and word is visible on every screen
-- A reservation takes three taps: what, day, time. Then one confirmation
+- A reservation takes few taps: what, day, first hour, last hour. Then one confirmation
 - Plain Swiss German words: Reservation, Anlass, Waschküche, Infotafel
 - Status is shown in words, not colour alone: "Frei", "Belegt · Name", "Meine Reservation"
 - Deleting always asks "Ja / Nein" first
@@ -31,20 +41,23 @@ Everything else the current app does (chat, marketplace, working groups, damage 
 
 | Screen | What it does |
 |---|---|
-| Login | Logo, username, password, "show password". Stays logged in on the device |
-| Start | Greeting, date, four tiles with live status, my reservations, contact block |
-| Räume & Tische | Pick a room or table, a day, a time slot, confirm |
-| Waschküche | Same flow, pick the floor first. The app remembers the floor |
-| Anlässe | List of events, "Ich komme" button, new event with automatic room reservation and clash warning |
-| Infotafel | Notices, important ones on top, residents can post |
+| Login | Logo, flat number, password, "show password". Stays logged in on the device |
+| Start | Info board first: next event with picture, further events, notices. Then three wide buttons to reserve, my reservations, contact block |
+| Räume | Pick a room, table or other thing, a day, the first and last hour (or "Ganzer Tag"), confirm |
+| Waschen | Same flow, pick the floor first. The app remembers the floor |
+| Anlässe | List of events with picture, "Wir kommen" button, new event with automatic room reservation and clash warning |
+| Verwalten (admins) | Add, edit, delete what can be reserved. Set admin email and WhatsApp link |
 
-A clickable prototype of all six screens is in `prototype/index.html`. It uses example data stored only in the browser.
+A clickable prototype of all screens is in `prototype/index.html`. It uses example data stored only in the browser. Tick "Als Admin anmelden" on the login screen to see the admin area.
 
 ## Rules built into the prototype
 
-- Washing slots: 07–10, 10–13, 13–16, 16–19, 19–22. None at night, as the house rules forbid washing 22:00–07:00
-- Rooms: Vormittag 08–12, Nachmittag 12–17, Abend 17–22 (proposal)
-- Guest room: per night
+- Every reservable thing has a name, a kind (Raum, Tisch, Waschmaschine, Anderes), an optional hint, opening hours, and a switch "whole day only"
+- Default hours are 07–22, as the house rules forbid washing 22:00–07:00. Admins can change them per thing
+- Reservations are in whole hours, 1 hour up to the whole day
+- Washing machines are named Erdgeschoss, 1. Stock, 2. Stock, 3. Stock (editable)
+- Guest room: whole day only
+- Residents plan events. Admins can cancel any event
 - Prices shown as hints: community room CHF 20 per day for private events, guest room CHF 20 per night (WBG price list of 29.09.2025, to be confirmed)
 - An event that needs a room creates the reservation itself. Cancelling the event frees the room
 
@@ -61,12 +74,11 @@ A clickable prototype of all six screens is in `prototype/index.html`. It uses e
 
 Alternative: a small own server (Node and SQLite) at a Swiss host. More control, more upkeep.
 
-## Admin area (not in the prototype yet)
+## Admin area
 
-- Create residents and reset passwords
-- Edit rooms, tables, floors and time slots
-- Set the admin email and the WhatsApp invite link
-- Pin or remove notices, remove any reservation
+In the prototype: manage reservable things, contact details, notices, cancel events.
+
+Still to build: create flat logins, reset passwords, remove any reservation.
 
 ## Steps
 
@@ -78,13 +90,9 @@ Alternative: a small own server (Node and SQLite) at a Swiss host. More control,
 
 ## Open questions
 
-- Which rooms and tables can be reserved? "Festtisch 1 / 2" in the prototype are examples
-- How are the four floors named (EG, 1. Stock ...)? One washing machine per floor, or also a tumbler to reserve?
-- Are the time slots right? Is there a limit per household per week?
-- Admin email address and WhatsApp invite link
-- May every resident post on the info board, or only admins?
-- "Du" or "Sie" in the app? The prototype avoids both where it can
-- One login per person or per flat?
+- Which rooms and tables exist? "Festtisch 1 / 2" are examples. Admins can now fix this in the app
+- Is there a limit per flat per week, for example for the washing machine?
+- May every flat plan events, or only admins?
 - Where should the data be hosted, and what yearly budget is acceptable?
 - Is the app in German only?
 
