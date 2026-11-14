@@ -202,7 +202,7 @@ const span = (from, to) => pad(from) + '–' + pad(to) + ' Uhr';
 const hoursText = n => n === 1 ? '1 Stunde' : n + ' Stunden';
 
 /* ---------- State (demo: stored on this device only) ---------- */
-const KEY = 'oele51-demo-v2';
+const KEY = 'oele51-demo-v3';
 let memory = null;
 function seed() {
   const d = n => iso(addDays(n));
@@ -222,16 +222,16 @@ function seed() {
       r('w3', '3. Stock', 'wasch', 'Waschmaschine')
     ],
     bookings: [
-      { id: 'b1', res: 'gr', date: d(3), from: 14, to: 17, by: 'Wohnung 2.03', ev: 'e1' },
-      { id: 'b2', res: 'te', date: d(9), from: 17, to: 20, by: 'Wohnung 3.01', ev: 'e2' },
+      { id: 'b1', res: 'gr', date: d(3), from: 14, to: 17, by: 'Vorstand', ev: 'e1' },
+      { id: 'b2', res: 'te', date: d(9), from: 17, to: 20, by: 'Vorstand', ev: 'e2' },
       { id: 'b3', res: 'w1', date: d(1), from: 9, to: 12, by: 'Wohnung 1.02' },
       { id: 'b4', res: 'w1', date: d(1), from: 15, to: 16, by: 'Wohnung 1.04' },
       { id: 'b5', res: 'gz', date: d(5), from: 7, to: 22, by: 'Wohnung 0.02' },
       { id: 'b6', res: 'gr', date: d(1), from: 18, to: 22, by: 'Wohnung 1.02' }
     ],
     events: [
-      { id: 'e1', title: 'Spielnachmittag', date: d(3), from: 14, to: 17, res: 'gr', desc: 'Jassen, Brettspiele, Kaffee und Kuchen. Alle sind willkommen.', img: '', by: 'Wohnung 2.03', going: ['Wohnung 2.03', 'Wohnung 1.02'] },
-      { id: 'e2', title: 'Apéro auf der Terrasse', date: d(9), from: 17, to: 20, res: 'te', desc: 'Jede Wohnung bringt etwas Kleines mit.', img: '', by: 'Wohnung 3.01', going: ['Wohnung 3.01'] }
+      { id: 'e1', title: 'Spielnachmittag', date: d(3), from: 14, to: 17, res: 'gr', desc: 'Jassen, Brettspiele, Kaffee und Kuchen. Alle sind willkommen.', img: '', by: 'Vorstand', going: ['Wohnung 2.03', 'Wohnung 1.02'] },
+      { id: 'e2', title: 'Apéro auf der Terrasse', date: d(9), from: 17, to: 20, res: 'te', desc: 'Jede Wohnung bringt etwas Kleines mit.', img: '', by: 'Vorstand', going: ['Wohnung 3.01'] }
     ],
     posts: [
       { id: 'p1', title: 'Willkommen in der neuen Oele51-App', body: 'Hier kannst du Räume, Tische und die Waschmaschine reservieren und siehst, was im Haus läuft.', important: true, by: 'Vorstand', date: d(0) },
@@ -247,7 +247,7 @@ let S = load();
 function save() { memory = S; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-const ui = { res: {}, day: today(), more: false, sel: null, form: null, edit: null, del: null, img: '', disp: false };
+const ui = { res: {}, day: today(), more: false, sel: null, form: null, edit: null, del: null, img: '', disp: false, rep: { every: 0, months: 4 } };
 
 /* ---------- Display settings (per device) ---------- */
 const P = (() => { const d = { size: 0, theme: 'auto' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('oele51-display') || '{}')); } catch (e) { return d; } })();
@@ -286,6 +286,15 @@ const isFree = (res, date, from, to) => !S.bookings.some(b => b.res === res && b
 const timeLabel = (x, r) => (r && x.from <= r.open && x.to >= r.close) || x.all ? 'Ganzer Tag' : span(x.from, x.to);
 const upcoming = list => list.filter(x => x.date >= today()).sort((a, b) => (a.date + pad(a.from)).localeCompare(b.date + pad(b.from)));
 const hourOptions = (lo, hi, sel) => { let h = ''; for (let i = lo; i <= hi; i++) h += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + pad(i) + ':00</option>'; return h; };
+const optsRow = (a, cur, list) => '<div class="row">' + list.map(x => '<button class="opt" data-a="' + a + '" data-v="' + x[0] + '" aria-pressed="' + (cur === x[0]) + '"><b>' + x[1] + '</b></button>').join('') + '</div>';
+// Repeating washing reservations: weekly or every 2 weeks, never further than 4 months ahead.
+function occurrences(startIso, every, months) {
+  const out = [startIso]; if (!every) return out;
+  const lim = addDays(0); lim.setMonth(lim.getMonth() + Math.min(months, 4)); const limIso = iso(lim);
+  const d = fromIso(startIso); d.setHours(12);
+  for (;;) { d.setDate(d.getDate() + 7 * every); if (iso(d) > limIso) break; out.push(iso(d)); }
+  return out;
+}
 let toastTimer;
 function toast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false;
@@ -339,7 +348,7 @@ function eventHtml(e, withPic) {
     (e.desc ? '<p class="body">' + esc(e.desc) + '</p>' : '') +
     '<p class="muted">' + (e.going.length === 1 ? '1 Wohnung kommt' : e.going.length + ' Wohnungen kommen') + '</p>' +
     '<div class="row"><button class="btn ' + (going ? '' : 'primary') + ' grow" data-a="going" data-v="' + e.id + '" aria-pressed="' + going + '">' + (going ? ic('check') + 'Wir kommen (antippen zum Abmelden)' : 'Wir kommen') + '</button>' +
-    (e.by === S.user || S.admin ? delButtons('event', e.id, 'Anlass absagen', 'Ja, absagen') : '') + '</div></article>';
+    (S.admin ? delButtons('event', e.id, 'Anlass absagen', 'Ja, absagen') : '') + '</div></article>';
 }
 
 function postFormHtml() {
@@ -372,11 +381,17 @@ function boardHtml() {
 function myBookingsHtml() {
   const mine = upcoming(S.bookings.filter(b => b.by === S.user));
   if (!mine.length) return '<p class="muted">Du hast noch nichts reserviert.</p>';
-  return '<ul class="list">' + mine.map(b => {
+  const seen = {};
+  const rows = mine.filter(b => !b.series || (seen[b.series] ? false : (seen[b.series] = true)));
+  return '<ul class="list">' + rows.map(b => {
     const r = resOf(b.res); const ev = b.ev && S.events.find(e => e.id === b.ev);
+    const rest = b.series ? mine.filter(x => x.series === b.series) : [b];
+    const many = rest.length > 1;
     return '<li><div class="grow"><div class="when">' + esc(shortDate(b.date)) + ' · ' + esc(timeLabel(b, r)) + '</div>' +
-      '<div>' + esc(resLabel(r)) + (ev ? ' · Anlass «' + esc(ev.title) + '»' : '') + '</div></div>' +
-      (ev ? '' : delButtons('booking', b.id, 'Absagen', 'Ja, absagen')) + '</li>';
+      '<div>' + esc(resLabel(r)) + (ev ? ' · Anlass «' + esc(ev.title) + '»' : '') + '</div>' +
+      (many ? '<div class="muted">Wiederholt sich ' + (b.every === 2 ? 'alle 2 Wochen' : 'jede Woche') + ' bis ' + esc(shortDate(rest[rest.length - 1].date)) + ' (noch ' + rest.length + ' Termine)</div>' : '') + '</div>' +
+      (ev ? '' : '<span class="row">' + delButtons('booking', b.id, many ? 'Nur diesen absagen' : 'Absagen', 'Ja, absagen') +
+        (many ? delButtons('series', b.series, 'Alle absagen', 'Ja, alle ' + rest.length + ' absagen') : '') + '</span>') + '</li>';
   }).join('') + '</ul>';
 }
 
@@ -396,8 +411,8 @@ function contactHtml() {
 function startView() {
   const tiles = [
     ['reservieren', 'Raum oder Tisch reservieren', 'Gemeinschaftsraum, Gästezimmer, Tische'],
-    ['waschen', 'Waschmaschine reservieren', 'Auf deinem Stock, von 1 Stunde bis zum ganzen Tag'],
-    ['anlaesse', 'Anlass planen', 'Einladen und den Raum gleich mitreservieren']
+    ['waschen', 'Waschmaschine reservieren', 'Einmal oder jede Woche, bis 4 Monate im Voraus'],
+    S.admin ? ['anlaesse', 'Anlass planen', 'Einladen und den Raum gleich mitreservieren'] : ['anlaesse', 'Anlässe ansehen', 'Was im Haus geplant ist']
   ];
   return header('Willkommen im Oele51', S.user + ' · ' + longDate(today())) +
     '<main>' + boardHtml() +
@@ -420,6 +435,13 @@ function dayBlocks(res, date) {
     else { if (h > nowH) out.push({ from: h, to: h + 1, b: null }); h++; }
   }
   return out;
+}
+
+function repeatHtml() {
+  const occ = occurrences(ui.day, ui.rep.every, ui.rep.months);
+  return '<div class="stack"><b>Wiederholen?</b>' + optsRow('rep', ui.rep.every, [[0, 'Nur dieses Mal'], [1, 'Jede Woche'], [2, 'Alle 2 Wochen']]) +
+    (ui.rep.every ? '<b>Wie lange?</b>' + optsRow('repm', ui.rep.months, [[1, '1 Monat'], [2, '2 Monate'], [3, '3 Monate'], [4, '4 Monate']]) +
+      '<p>' + occ.length + ' Termine, der letzte am ' + esc(longDate(occ[occ.length - 1])) + '. Mehr als 4 Monate im Voraus geht nicht.</p>' : '') + '</div>';
 }
 
 function bookingView(kind) {
@@ -464,15 +486,15 @@ function bookingView(kind) {
   h += '</section>';
   if (ui.sel) {
     h += '<section class="confirm" id="confirm"><h2>Stimmt das so?</h2><p><b>' + esc(resLabel(res)) + '</b><br>' + esc(longDate(ui.day)) + '<br>' +
-      esc(full ? 'Ganzer Tag' : span(ui.sel.from, ui.sel.to) + ' (' + hoursText(ui.sel.to - ui.sel.from) + ')') + '</p>' +
+      esc(full ? 'Ganzer Tag' : span(ui.sel.from, ui.sel.to) + ' (' + hoursText(ui.sel.to - ui.sel.from) + ')') + '</p>' + (wash ? repeatHtml() : '') +
       '<div class="row"><button class="btn primary grow" data-a="book">Jetzt reservieren</button><button class="btn quiet" data-a="unpick">Abbrechen</button></div></section>';
   }
   return h + '</main>';
 }
 
 function eventsView() {
-  let h = header('Anlässe', 'Gemeinsame Termine im Haus. Der Raum wird beim Speichern gleich mitreserviert.') + '<main>';
-  if (ui.form === 'event') {
+  let h = header('Anlässe', S.admin ? 'Gemeinsame Termine im Haus. Der Raum wird beim Speichern gleich mitreserviert.' : 'Gemeinsame Termine im Haus. Sag mit «Wir kommen» Bescheid, wenn ihr dabei seid.') + '<main>';
+  if (S.admin && ui.form === 'event') {
     const places = S.resources.filter(r => r.cat !== 'wasch');
     h += '<form id="evform" class="card" novalidate><h2>Neuer Anlass</h2>' +
       '<div><label for="ev-title">Titel</label><input type="text" id="ev-title" maxlength="60"></div>' +
@@ -485,7 +507,7 @@ function eventsView() {
       '<div><label for="ev-img">Bild <small>(freiwillig)</small></label><input type="file" id="ev-img" accept="image/*"><img id="ev-prev" alt="" hidden></div>' +
       '<p class="err" id="ev-err" role="alert"></p>' +
       '<div class="row"><button class="btn primary grow" type="submit">Anlass speichern</button><button class="btn quiet" type="button" data-a="form-close">Abbrechen</button></div></form>';
-  } else {
+  } else if (S.admin) {
     h += '<button class="btn primary wide" data-a="form-event">Neuen Anlass planen</button>';
   }
   const list = upcoming(S.events);
@@ -538,6 +560,7 @@ function render() {
 /* ---------- Actions ---------- */
 function removeByKey(key) {
   const [kind, id] = key.split(':');
+  if (kind === 'series') { S.bookings = S.bookings.filter(b => !(b.series === id && b.date >= today())); toast('Alle Termine abgesagt'); }
   if (kind === 'booking') { S.bookings = S.bookings.filter(b => b.id !== id); toast('Reservation abgesagt'); }
   if (kind === 'event') { S.events = S.events.filter(e => e.id !== id); S.bookings = S.bookings.filter(b => b.ev !== id); toast('Anlass abgesagt, Raum wieder frei'); }
   if (kind === 'post') { S.posts = S.posts.filter(p => p.id !== id); toast('Mitteilung gelöscht'); }
@@ -574,9 +597,20 @@ document.addEventListener('click', e => {
   else if (a === 'hour' && res) pickHour(res, Number(v));
   else if (a === 'allday' && res) { const full = ui.sel && ui.sel.from === res.open && ui.sel.to === res.close; ui.sel = full ? null : { from: res.open, to: res.close }; }
   else if (a === 'unpick') ui.sel = null;
+  else if (a === 'rep') ui.rep.every = Number(v);
+  else if (a === 'repm') ui.rep.months = Number(v);
   else if (a === 'book' && res && ui.sel) {
-    if (isFree(res.id, ui.day, ui.sel.from, ui.sel.to)) { S.bookings.push({ id: uid('b'), res: res.id, date: ui.day, from: ui.sel.from, to: ui.sel.to, by: S.user }); save(); toast('Reserviert für ' + shortDate(ui.day)); }
-    ui.sel = null;
+    const dates = r === 'waschen' ? occurrences(ui.day, ui.rep.every, ui.rep.months) : [ui.day];
+    const series = dates.length > 1 ? uid('s') : null; let ok = 0;
+    dates.forEach(d => {
+      if (!isFree(res.id, d, ui.sel.from, ui.sel.to)) return;
+      const b = { id: uid('b'), res: res.id, date: d, from: ui.sel.from, to: ui.sel.to, by: S.user };
+      if (series) { b.series = series; b.every = ui.rep.every; }
+      S.bookings.push(b); ok++;
+    });
+    save();
+    toast(dates.length === 1 ? (ok ? 'Reserviert für ' + shortDate(ui.day) : 'Das ist leider schon belegt') : ok + ' Termine reserviert' + (ok < dates.length ? ', ' + (dates.length - ok) + ' waren schon belegt' : ''));
+    ui.sel = null; ui.rep = { every: 0, months: 4 };
   }
   else if (a === 'del-ask') ui.del = v;
   else if (a === 'del-no') ui.del = null;
@@ -632,6 +666,7 @@ document.addEventListener('submit', e => {
     save(); render(); scrollTo(0, 0);
   }
   if (e.target.id === 'evform') {
+    if (!S.admin) return;
     const title = val('ev-title'), date = val('ev-date'), resId = val('ev-res'), res = resId && resOf(resId);
     const all = el('ev-all').checked || (res && res.dayOnly);
     const from = all ? (res ? res.open : 7) : Number(val('ev-from')), to = all ? (res ? res.close : 22) : Number(val('ev-to'));

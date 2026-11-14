@@ -11,6 +11,9 @@ Status: draft for the Hausverein, 14 Nov 2026.
 - Only admins post notices on the info board
 - The info board opens the start page, with the next event first and a picture if there is one
 - Admin email and WhatsApp link do not exist yet. Admins enter them later in the app
+- Washing machine reservations can repeat (every week or every 2 weeks), at most 4 months in advance
+- Only admins plan events. Events show on the info board
+- No limit per flat
 - Each device can set the text size (Normal, Gross, Sehr gross) and light or dark colours
 - Contrast is strong enough to read in bright light: near-black text on white, dark green buttons, clear borders
 
@@ -47,7 +50,7 @@ Everything else the current app does (chat, marketplace, working groups, damage 
 | Start | Info board first: next event with picture, further events, notices. Then three wide buttons to reserve, my reservations, contact block |
 | Räume | Pick a room, table or other thing, a day, the first and last hour (or "Ganzer Tag"), confirm |
 | Waschen | Same flow, pick the floor first. The app remembers the floor |
-| Anlässe | List of events with picture, "Wir kommen" button, new event with automatic room reservation and clash warning |
+| Anlässe | List of events with picture, "Wir kommen" button. Admins add events with automatic room reservation and clash warning |
 | Verwalten (admins) | Add, edit, delete what can be reserved. Set admin email and WhatsApp link |
 
 A clickable prototype of all screens is in `prototype/index.html`. It uses example data stored only in the browser. Tick "Als Admin anmelden" on the login screen to see the admin area.
@@ -59,7 +62,8 @@ A clickable prototype of all screens is in `prototype/index.html`. It uses examp
 - Reservations are in whole hours, 1 hour up to the whole day
 - Washing machines are named Erdgeschoss, 1. Stock, 2. Stock, 3. Stock (editable)
 - Guest room: whole day only
-- Residents plan events. Admins can cancel any event
+- Admins plan and cancel events. Residents answer with "Wir kommen"
+- A repeating washing reservation skips dates that are already taken and says how many. It can be cancelled one date at a time or all at once
 - Prices shown as hints: community room CHF 20 per day for private events, guest room CHF 20 per night (WBG price list of 29.09.2025, to be confirmed)
 - An event that needs a room creates the reservation itself. Cancelling the event frees the room
 
@@ -93,8 +97,6 @@ Still to build: create flat logins, reset passwords, remove any reservation.
 ## Open questions
 
 - Which rooms and tables exist? "Festtisch 1 / 2" are examples. Admins can now fix this in the app
-- Is there a limit per flat per week, for example for the washing machine?
-- May every flat plan events, or only admins?
 - Where should the data be hosted, and what yearly budget is acceptable?
 - Is the app in German only?
 
