@@ -11,6 +11,8 @@ Status: draft for the Hausverein, 14 Nov 2026.
 - Only admins post notices on the info board
 - The info board opens the start page, with the next event first and a picture if there is one
 - Admin email and WhatsApp link do not exist yet. Admins enter them later in the app
+- Each device can set the text size (Normal, Gross, Sehr gross) and light or dark colours
+- Contrast is strong enough to read in bright light: near-black text on white, dark green buttons, clear borders
 
 ## Goal
 

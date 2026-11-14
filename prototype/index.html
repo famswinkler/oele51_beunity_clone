@@ -4,39 +4,39 @@
 <style>
 /* Layout: one narrow column. Start page opens with the info board (events first, with picture), then three wide reservation buttons. Labelled bottom bar on every screen. */
 :root {
-  --bg: #F2F5EE;
+  --bg: #F1F4EC;
   --surface: #FFFFFF;
-  --ink: #263131;
-  --muted: #54605D;
-  --green: #4E6644;
+  --ink: #0F1A1A;
+  --muted: #36423F;
+  --green: #2E4A27;
   --on-green: #FFFFFF;
-  --green-soft: #E2E9DA;
-  --sage: #909C84;
+  --green-soft: #DCE6D2;
+  --sage: #5E6E55;
   --peach: #C8A898;
-  --peach-soft: #F4E7E0;
-  --line: #C6CFBE;
-  --danger: #9C3526;
+  --peach-soft: #F6E4DA;
+  --line: #8A977F;
+  --danger: #8C2414;
   --plate: #FFFFFF;
   --font: "Atkinson Hyperlegible", "Segoe UI", Verdana, Arial, sans-serif;
   --r: 14px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #1B2222; --surface: #263030; --ink: #EEF2EA; --muted: #B5BFB4;
-    --green: #AAC29A; --on-green: #162016; --green-soft: #35433A; --sage: #909C84;
-    --peach: #D9B8A8; --peach-soft: #46382F; --line: #4A5652; --danger: #F29A8E;
+    --bg: #0F1414; --surface: #1B2323; --ink: #FFFFFF; --muted: #D2DAD0;
+    --green: #B9D3A8; --on-green: #0C140C; --green-soft: #2C3A30; --sage: #A3B197;
+    --peach: #E2C2B2; --peach-soft: #3E3028; --line: #7F8C83; --danger: #FFB0A4;
     --plate: #FFFFFF; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #1B2222; --surface: #263030; --ink: #EEF2EA; --muted: #B5BFB4;
-  --green: #AAC29A; --on-green: #162016; --green-soft: #35433A; --sage: #909C84;
-  --peach: #D9B8A8; --peach-soft: #46382F; --line: #4A5652; --danger: #F29A8E;
+  --bg: #0F1414; --surface: #1B2323; --ink: #FFFFFF; --muted: #D2DAD0;
+  --green: #B9D3A8; --on-green: #0C140C; --green-soft: #2C3A30; --sage: #A3B197;
+  --peach: #E2C2B2; --peach-soft: #3E3028; --line: #7F8C83; --danger: #FFB0A4;
   --plate: #FFFFFF; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.5; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 1.125rem; line-height: 1.5; }
 #app {
   max-width: 760px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -67,10 +67,14 @@ button, .btn, input, select, textarea { font: inherit; color: inherit; }
 .btn.quiet { border-color: var(--line); font-weight: 400; }
 .btn.danger { border-color: var(--danger); color: var(--danger); }
 .btn.wide { width: 100%; }
-.btn[disabled] { opacity: .55; cursor: not-allowed; }
+.btn[disabled] { border-style: dashed; border-color: var(--line); color: var(--muted); background: transparent; cursor: not-allowed; }
 :focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
 
-.top { display: flex; align-items: center; gap: 14px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.top .name { flex: 1 1 auto; }
+.row > .opt { flex: 1 1 8rem; align-items: center; text-align: center; }
+.row > .opt b { hyphens: manual; overflow-wrap: normal; }
+.loginbox > .btn.disp { align-self: flex-end; }
 .plate { background: var(--plate); border-radius: 12px; padding: 6px 10px; flex: none; line-height: 0; }
 .plate img { height: 52px; width: auto; }
 .top .name { font-weight: 700; font-size: 1.25rem; line-height: 1.15; }
@@ -133,7 +137,7 @@ textarea { min-height: 120px; resize: vertical; }
 .step > h2 { display: flex; gap: 12px; align-items: center; }
 .num { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 1.1rem; }
 .choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
-.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 10px; }
+.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 10px; }
 .opt {
   min-height: 64px; padding: 10px 12px; border-radius: 12px; cursor: pointer;
   background: var(--surface); border: 2px solid var(--line); text-align: left;
@@ -168,7 +172,7 @@ nav.bar ul { list-style: none; margin: 0 auto; padding: 0; max-width: 760px; dis
 nav.bar a {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   min-height: 66px; border-radius: 12px; text-decoration: none; color: var(--ink);
-  font-size: .84rem; font-weight: 700; text-align: center; line-height: 1.15; overflow-wrap: anywhere;
+  font-size: min(.84rem, 15px); font-weight: 700; text-align: center; line-height: 1.15; overflow-wrap: anywhere;
 }
 nav.bar a[aria-current="page"] { background: var(--green); color: var(--on-green); }
 #toast {
@@ -243,7 +247,19 @@ let S = load();
 function save() { memory = S; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-const ui = { res: {}, day: today(), more: false, sel: null, form: null, edit: null, del: null, img: '' };
+const ui = { res: {}, day: today(), more: false, sel: null, form: null, edit: null, del: null, img: '', disp: false };
+
+/* ---------- Display settings (per device) ---------- */
+const P = (() => { const d = { size: 0, theme: 'auto' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('oele51-display') || '{}')); } catch (e) { return d; } })();
+const hostTheme = document.documentElement.getAttribute('data-theme');
+function applyP() {
+  const de = document.documentElement;
+  de.style.fontSize = ['100%', '118%', '136%'][P.size] || '100%';
+  if (P.theme === 'light' || P.theme === 'dark') de.setAttribute('data-theme', P.theme);
+  else if (hostTheme) de.setAttribute('data-theme', hostTheme); else de.removeAttribute('data-theme');
+}
+function saveP() { applyP(); try { localStorage.setItem('oele51-display', JSON.stringify(P)); } catch (e) {} }
+applyP();
 
 /* ---------- Helpers ---------- */
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -262,7 +278,7 @@ const ICONS = {
   user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.5 3.600-5 7-5s6.200 1.500 7 5"/>'
 };
 const ic = n => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>';
-const navItems = () => [['start', 'Start'], ['reservieren', 'Räume'], ['waschen', 'Waschen'], ['anlaesse', 'Anlässe']].concat(S.admin ? [['verwalten', 'Verwalten']] : []);
+const navItems = () => [['start', 'Start'], ['reservieren', 'Räume'], ['waschen', 'Waschen'], ['anlaesse', 'Anlässe']].concat(S.admin ? [['verwalten', 'Admin']] : []);
 const route = () => { const h = location.hash.slice(1); return navItems().some(n => n[0] === h) ? h : 'start'; };
 const resOf = id => S.resources.find(r => r.id === id);
 const resLabel = r => r ? (r.cat === 'wasch' ? 'Waschmaschine ' + r.name : r.name) : 'Gelöscht';
@@ -282,14 +298,22 @@ function delButtons(kind, id, label, yes) {
 }
 
 /* ---------- Views ---------- */
+const dispButton = () => '<button class="btn quiet disp" data-a="disp" aria-expanded="' + ui.disp + '"><b aria-hidden="true">Aa</b>Anzeige</button>';
+function dispPanel() {
+  const opts = (a, cur, list) => '<div class="row">' + list.map(x => '<button class="opt" data-a="' + a + '" data-v="' + x[0] + '" aria-pressed="' + (String(cur) === String(x[0])) + '"><b>' + x[1] + '</b></button>').join('') + '</div>';
+  return '<section class="card" aria-labelledby="dp-h"><h2 id="dp-h">Anzeige</h2>' +
+    '<div class="stack"><b>Schriftgrösse</b>' + opts('size', P.size, [[0, 'Normal'], [1, 'Gross'], [2, 'Sehr gross']]) + '</div>' +
+    '<div class="stack"><b>Farben</b>' + opts('theme', P.theme, [['light', 'Hell'], ['dark', 'Dunkel'], ['auto', 'Wie das Gerät']]) + '</div>' +
+    '<button class="btn primary" data-a="disp">Fertig</button></section>';
+}
 function header(title, lead) {
   return '<header class="top"><span class="plate"><img src="logo-mark.jpg" alt=""></span>' +
-    '<span class="name">Oele51<small>Hausverein</small></span></header>' +
+    '<span class="name">Oele51<small>Hausverein</small></span>' + dispButton() + '</header>' + (ui.disp ? dispPanel() : '') +
     (title ? '<div class="hello"><h1>' + esc(title) + '</h1>' + (lead ? '<p class="muted">' + esc(lead) + '</p>' : '') + '</div>' : '');
 }
 
 function loginView() {
-  return '<main class="loginbox">' +
+  return '<main class="loginbox">' + dispButton() + (ui.disp ? dispPanel() : '') +
     '<span class="logo"><img src="logo.jpg" alt="Oele51 Hausverein"></span>' +
     '<div class="stack"><h1>Willkommen zu Hause</h1><p class="muted">Schau, was im Haus läuft, und reserviere Räume, Tische und die Waschmaschine.</p></div>' +
     '<form id="login" class="stack" novalidate>' +
@@ -540,7 +564,10 @@ document.addEventListener('click', e => {
     try { navigator.clipboard.writeText(S.contact.email).then(done, fallback); } catch (err) { fallback(); }
     return;
   }
-  if (a === 'logout') { S.user = null; S.admin = false; save(); location.hash = ''; }
+  if (a === 'disp') ui.disp = !ui.disp;
+  else if (a === 'size') { P.size = Number(v); saveP(); }
+  else if (a === 'theme') { P.theme = v; saveP(); }
+  else if (a === 'logout') { S.user = null; S.admin = false; save(); location.hash = ''; }
   else if (a === 'res') { ui.res[r] = v; if (r === 'waschen') { S.lastWash = v; save(); } ui.sel = null; }
   else if (a === 'day') { ui.day = v; ui.sel = null; }
   else if (a === 'more') ui.more = true;
@@ -564,7 +591,9 @@ document.addEventListener('click', e => {
     if (ev.going.includes(S.user)) { ev.going = ev.going.filter(n => n !== S.user); toast('Abgemeldet'); } else { ev.going.push(S.user); toast('Angemeldet'); }
     save();
   }
+  const keep = ['lg-name', 'lg-pass'].map(id => { const f = document.getElementById(id); return f ? f.value : null; });
   render();
+  ['lg-name', 'lg-pass'].forEach((id, i) => { const f = document.getElementById(id); if (f && keep[i] != null) f.value = keep[i]; });
   const focus = id => { const f = document.getElementById(id); if (f) f.focus(); };
   if ((a === 'hour' || a === 'allday') && ui.sel) { const c = document.getElementById('confirm'); if (c) c.scrollIntoView({ block: 'nearest' }); }
   if (a === 'form-event') focus('ev-title');
@@ -637,6 +666,6 @@ document.addEventListener('submit', e => {
   }
 });
 
-addEventListener('hashchange', () => { ui.sel = null; ui.form = null; ui.edit = null; ui.del = null; ui.day = today(); render(); scrollTo(0, 0); });
+addEventListener('hashchange', () => { ui.disp = false; ui.sel = null; ui.form = null; ui.edit = null; ui.del = null; ui.day = today(); render(); scrollTo(0, 0); });
 render();
 </script>
