@@ -1,0 +1,527 @@
+<title>Oele51 Hausverein App</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: one narrow column, four large tiles on the start page, a labelled bottom bar that is always visible. */
+:root {
+  --bg: #F2F5EE;
+  --surface: #FFFFFF;
+  --ink: #263131;
+  --muted: #54605D;
+  --green: #4E6644;
+  --on-green: #FFFFFF;
+  --green-soft: #E2E9DA;
+  --sage: #909C84;
+  --peach: #C8A898;
+  --peach-soft: #F4E7E0;
+  --line: #C6CFBE;
+  --danger: #9C3526;
+  --plate: #FFFFFF;
+  --font: "Atkinson Hyperlegible", "Segoe UI", Verdana, Arial, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1B2222; --surface: #263030; --ink: #EEF2EA; --muted: #B5BFB4;
+    --green: #AAC29A; --on-green: #162016; --green-soft: #35433A; --sage: #909C84;
+    --peach: #D9B8A8; --peach-soft: #46382F; --line: #4A5652; --danger: #F29A8E;
+    --plate: #FFFFFF; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1B2222; --surface: #263030; --ink: #EEF2EA; --muted: #B5BFB4;
+  --green: #AAC29A; --on-green: #162016; --green-soft: #35433A; --sage: #909C84;
+  --peach: #D9B8A8; --peach-soft: #46382F; --line: #4A5652; --danger: #F29A8E;
+  --plate: #FFFFFF; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font); font-size: 18px; line-height: 1.5;
+}
+#app {
+  max-width: 760px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 120px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+#app.login { padding-block: 24px 32px; }
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: 1.9rem; line-height: 1.2; text-wrap: balance; }
+h2 { font-size: 1.35rem; line-height: 1.25; text-wrap: balance; }
+h3 { font-size: 1.1rem; }
+.muted { color: var(--muted); }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.row > .grow { flex: 1 1 200px; min-width: 0; }
+svg.ic { width: 1.6em; height: 1.6em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Buttons */
+button, .btn, input, select, textarea { font: inherit; color: inherit; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 56px; padding: 10px 22px; border-radius: 12px;
+  border: 2px solid var(--green); background: var(--surface); color: var(--ink);
+  font-weight: 700; text-decoration: none; cursor: pointer; text-align: center;
+}
+.btn.primary { background: var(--green); color: var(--on-green); }
+.btn.quiet { border-color: var(--line); font-weight: 400; }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.wide { width: 100%; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
+
+/* Header */
+.top { display: flex; align-items: center; gap: 14px; }
+.plate { background: var(--plate); border-radius: 12px; padding: 6px 10px; flex: none; line-height: 0; }
+.plate img { height: 52px; width: auto; }
+.top .name { font-weight: 700; font-size: 1.25rem; line-height: 1.15; }
+.top .name small { display: block; font-weight: 400; font-size: 1rem; color: var(--muted); }
+.demo { background: var(--peach-soft); border-radius: 10px; padding: 10px 14px; font-size: .95rem; }
+
+/* Login */
+.loginbox { background: var(--surface); border-radius: 20px; padding: 28px 22px; display: flex; flex-direction: column; gap: 20px; }
+.loginbox .logo { align-self: center; background: var(--plate); border-radius: 16px; padding: 8px; line-height: 0; }
+.loginbox .logo img { width: 230px; height: auto; }
+label { font-weight: 700; display: block; margin-bottom: 6px; }
+input[type=text], input[type=password], input[type=date], select, textarea {
+  width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px;
+  border: 2px solid var(--sage); background: var(--surface);
+}
+textarea { min-height: 120px; resize: vertical; }
+.check { display: flex; gap: 12px; align-items: center; font-weight: 400; margin: 0; min-height: 44px; }
+.check input { width: 26px; height: 26px; accent-color: var(--green); flex: none; }
+.err { color: var(--danger); font-weight: 700; }
+.err:empty { display: none; }
+
+/* Start page */
+.hello { display: flex; flex-direction: column; gap: 4px; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  min-height: 170px; padding: 18px; border-radius: var(--r); text-align: left;
+  background: var(--surface); border: 2px solid var(--line); cursor: pointer; text-decoration: none; color: var(--ink);
+}
+.tile:hover { border-color: var(--green); }
+.tile .badge { background: var(--green-soft); color: var(--green); border-radius: 50%; width: 60px; height: 60px; display: grid; place-items: center; }
+.tile .badge svg { width: 34px; height: 34px; }
+.tile strong { font-size: 1.25rem; line-height: 1.2; overflow-wrap: anywhere; hyphens: auto; }
+.tile span.muted { font-size: .98rem; line-height: 1.35; }
+@media (max-width: 340px) { .tiles { grid-template-columns: 1fr; } .tile { min-height: 0; } }
+
+.list { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--line); }
+.list > li { padding: 14px 0; border-bottom: 2px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.list > li > .grow { flex: 1 1 220px; min-width: 0; }
+.when { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.contact { background: var(--green-soft); border-radius: var(--r); padding: 20px 18px; display: flex; flex-direction: column; gap: 16px; }
+.mail { font-weight: 700; user-select: all; overflow-wrap: anywhere; }
+
+/* Booking */
+.step { display: flex; flex-direction: column; gap: 12px; }
+.step > h2 { display: flex; gap: 12px; align-items: center; }
+.num { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: 1.1rem; }
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 10px; }
+.opt {
+  min-height: 64px; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+  background: var(--surface); border: 2px solid var(--line); text-align: left;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; line-height: 1.25;
+}
+.opt b { overflow-wrap: anywhere; hyphens: auto; }
+.opt small { font-size: .9rem; color: var(--muted); }
+.opt[aria-pressed="true"] { border-color: var(--green); background: var(--green); color: var(--on-green); }
+.opt[aria-pressed="true"] small { color: var(--on-green); }
+.days .opt { text-align: center; align-items: center; font-variant-numeric: tabular-nums; }
+.slots { display: flex; flex-direction: column; gap: 10px; }
+.slot {
+  min-height: 68px; padding: 12px 16px; border-radius: 12px; text-align: left;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px;
+  background: var(--surface); border: 2px solid var(--green); cursor: pointer;
+}
+.slot .t { font-weight: 700; font-variant-numeric: tabular-nums; }
+.slot .s { display: inline-flex; align-items: center; gap: 8px; }
+.slot.taken { border: 2px dashed var(--line); background: transparent; color: var(--muted); cursor: default; }
+.slot.mine { border-color: var(--green); background: var(--green-soft); cursor: default; }
+.slot.picked { background: var(--green); color: var(--on-green); }
+.confirm { background: var(--peach-soft); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Events and notices */
+.card { background: var(--surface); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.card .meta > span { display: flex; gap: 8px; align-items: flex-start; }
+.card .meta > span > span { min-width: 0; }
+.pill { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 2px 12px; border-radius: 999px; font-size: .9rem; font-weight: 700; letter-spacing: .03em; background: var(--peach); color: #2B2320; }
+.body { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 65ch; }
+
+/* Bottom bar */
+nav.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--surface); border-top: 2px solid var(--line);
+  padding: 6px max(6px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-left, 0px));
+}
+nav.bar ul { list-style: none; margin: 0 auto; padding: 0; max-width: 760px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+nav.bar a {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 66px; border-radius: 12px; text-decoration: none; color: var(--ink);
+  font-size: .86rem; font-weight: 700; text-align: center; line-height: 1.15; overflow-wrap: anywhere;
+}
+nav.bar a[aria-current="page"] { background: var(--green); color: var(--on-green); }
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+  background: var(--ink); color: var(--bg); padding: 14px 22px; border-radius: 12px; font-weight: 700;
+  max-width: calc(100% - 32px); text-align: center;
+}
+@media (prefers-reduced-motion: no-preference) { .tile, .opt, .slot, .btn { transition: border-color .15s, background-color .15s; } }
+</style>
+
+<div id="app" lang="de-CH"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+/* ---------- Settings the admins fill in ---------- */
+const CONFIG = {
+  adminEmail: 'vorstand@example.org',   // placeholder
+  whatsappUrl: ''                       // e.g. https://chat.whatsapp.com/XXXX (group invite link)
+};
+
+const DAY3 = [
+  { id: 'vm', name: 'Vormittag', time: '08–12 Uhr' },
+  { id: 'nm', name: 'Nachmittag', time: '12–17 Uhr' },
+  { id: 'ab', name: 'Abend', time: '17–22 Uhr' }
+];
+const NIGHT = [{ id: 'na', name: 'Eine Nacht', time: 'Anreise an diesem Tag' }];
+// House rules: no washing between 22:00 and 07:00.
+const WASH5 = ['07–10', '10–13', '13–16', '16–19', '19–22'].map(t => ({ id: t.slice(0, 2), name: t + ' Uhr', time: '' }));
+
+const ROOMS = [
+  { id: 'gr', name: 'Gemeinschaftsraum', hint: 'Privater Anlass CHF 20 pro Tag', slots: DAY3 },
+  { id: 'te', name: 'Terrasse', hint: 'Beim Gemeinschaftsraum', slots: DAY3 },
+  { id: 'gz', name: 'Gästezimmer', hint: 'CHF 20 pro Nacht', slots: NIGHT },
+  { id: 't1', name: 'Festtisch 1', hint: 'Beispiel', slots: DAY3 },
+  { id: 't2', name: 'Festtisch 2', hint: 'Beispiel', slots: DAY3 }
+];
+const WASH = [1, 2, 3, 4].map(n => ({ id: 'w' + n, name: n + '. Stock', hint: 'Waschmaschine', slots: WASH5 }));
+const ALL = ROOMS.concat(WASH);
+const resOf = id => ALL.find(r => r.id === id);
+const slotOf = (res, id) => res.slots.find(s => s.id === id);
+
+/* ---------- Dates ---------- */
+const pad = n => String(n).padStart(2, '0');
+const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const fromIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
+const today = () => iso(addDays(0));
+const fmt = (s, opt) => new Intl.DateTimeFormat('de-CH', opt).format(fromIso(s));
+const longDate = s => fmt(s, { weekday: 'long', day: 'numeric', month: 'long' });
+const shortDate = s => fmt(s, { weekday: 'short', day: 'numeric', month: 'short' });
+
+/* ---------- State (demo: stored on this device only) ---------- */
+const KEY = 'oele51-demo-v1';
+let memory = null;
+function seed() {
+  const d = n => iso(addDays(n));
+  return {
+    user: null, floor: 'w1',
+    bookings: [
+      { id: 'b1', res: 'gr', date: d(3), slot: 'nm', by: 'M. Huber', ev: 'e1' },
+      { id: 'b2', res: 'te', date: d(9), slot: 'ab', by: 'Vorstand', ev: 'e2' },
+      { id: 'b3', res: 'w1', date: d(0), slot: '10', by: 'R. Baumann' },
+      { id: 'b4', res: 'w2', date: d(1), slot: '07', by: 'Fam. Keller' },
+      { id: 'b5', res: 'gz', date: d(5), slot: 'na', by: 'Fam. Keller' },
+      { id: 'b6', res: 'gr', date: d(1), slot: 'ab', by: 'R. Baumann' }
+    ],
+    events: [
+      { id: 'e1', title: 'Spielnachmittag', date: d(3), slot: 'nm', res: 'gr', desc: 'Jassen, Brettspiele, Kaffee und Kuchen. Alle sind willkommen.', by: 'M. Huber', going: ['M. Huber', 'R. Baumann'] },
+      { id: 'e2', title: 'Apéro auf der Terrasse', date: d(9), slot: 'ab', res: 'te', desc: 'Jede Wohnung bringt etwas Kleines mit.', by: 'Vorstand', going: ['Vorstand'] }
+    ],
+    posts: [
+      { id: 'p1', title: 'Willkommen in der neuen Oele51-App', body: 'Hier lassen sich Räume, Tische und die Waschküche reservieren, Anlässe planen und Mitteilungen lesen.', important: true, by: 'Vorstand', date: d(0) },
+      { id: 'p2', title: 'Ruhezeiten', body: 'Von 22 bis 7 Uhr bitte nicht waschen oder tumblern (Hausordnung).', important: false, by: 'Vorstand', date: d(-2) }
+    ]
+  };
+}
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw); } catch (e) {}
+  return memory || seed();
+}
+let S = load();
+function save() { memory = S; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+const ui = { room: 'gr', day: today(), more: false, pick: null, form: null, del: null };
+
+/* ---------- Helpers ---------- */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ICONS = {
+  start: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/>',
+  raeume: '<rect x="4" y="3" width="13" height="18" rx="1"/><path d="M17 21h3"/><circle cx="13.5" cy="12" r=".6"/>',
+  waschen: '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="13.5" r="4.5"/><path d="M7.5 6.5h2"/>',
+  anlaesse: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15.5 2 2 4-4"/>',
+  infos: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6.5L20.500 7"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
+  pin: '<path d="M12 21s6-5.6 6-10.5a6 6 0 1 0-12 0C6 15.400 12 21 12 21z"/><circle cx="12" cy="10.500" r="2"/>',
+  clock: '<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>',
+  user: '<circle cx="12" cy="8.500" r="3.500"/><path d="M5 20c.8-3.500 3.600-5 7-5s6.200 1.500 7 5"/>'
+};
+const ic = n => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>';
+const NAV = [['start', 'Start'], ['raeume', 'Räume & Tische'], ['waschen', 'Waschen'], ['anlaesse', 'Anlässe'], ['infos', 'Infotafel']];
+const route = () => { const h = location.hash.slice(1); return NAV.some(n => n[0] === h) ? h : 'start'; };
+const findBooking = (res, date, slot) => S.bookings.find(b => b.res === res && b.date === date && b.slot === slot);
+const upcoming = list => list.filter(x => x.date >= today()).sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
+const slotLabel = (res, id) => { const s = slotOf(res, id); return s ? s.name + (s.time && res.slots !== NIGHT ? ', ' + s.time : '') : ''; };
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
+}
+
+/* ---------- Views ---------- */
+function header(title, lead) {
+  return '<header class="top"><span class="plate"><img src="logo-mark.jpg" alt=""></span>' +
+    '<span class="name">Oele51<small>Hausverein</small></span></header>' +
+    (title ? '<div class="hello"><h1>' + esc(title) + '</h1>' + (lead ? '<p class="muted">' + esc(lead) + '</p>' : '') + '</div>' : '');
+}
+
+function loginView() {
+  return '<main class="loginbox">' +
+    '<span class="logo"><img src="logo.jpg" alt="Oele51 Hausverein"></span>' +
+    '<div class="stack"><h1>Willkommen zu Hause</h1><p class="muted">Räume, Waschküche, Anlässe und Mitteilungen im Oele51.</p></div>' +
+    '<form id="login" class="stack" novalidate>' +
+      '<div><label for="lg-name">Benutzername</label><input type="text" id="lg-name" autocomplete="username" autocapitalize="words"></div>' +
+      '<div><label for="lg-pass">Passwort</label><input type="password" id="lg-pass" autocomplete="current-password"></div>' +
+      '<label class="check"><input type="checkbox" id="lg-show" data-a="showpass"> Passwort anzeigen</label>' +
+      '<p class="err" id="lg-err" role="alert"></p>' +
+      '<button class="btn primary wide" type="submit">Anmelden</button>' +
+      '<p class="muted">Die Anmeldung bleibt auf diesem Gerät gespeichert. Beim nächsten Mal öffnet sich die App direkt.</p>' +
+    '</form>' +
+    '<p class="demo">Demo: einen beliebigen Namen und ein beliebiges Passwort eingeben.</p>' +
+    '</main>';
+}
+
+function myBookingsHtml() {
+  const mine = upcoming(S.bookings.filter(b => b.by === S.user));
+  if (!mine.length) return '<p class="muted">Noch keine Reservation. Oben eine Kachel antippen, um zu reservieren.</p>';
+  return '<ul class="list">' + mine.map(b => {
+    const r = resOf(b.res); const wash = b.res[0] === 'w';
+    const ev = b.ev && S.events.find(e => e.id === b.ev);
+    return '<li><div class="grow"><div class="when">' + esc(shortDate(b.date)) + ' · ' + esc(slotLabel(r, b.slot)) + '</div>' +
+      '<div>' + esc(wash ? 'Waschmaschine ' + r.name : r.name) + (ev ? ' · Anlass «' + esc(ev.title) + '»' : '') + '</div></div>' +
+      (ev ? '' : delButtons('booking', b.id, 'Absagen')) + '</li>';
+  }).join('') + '</ul>';
+}
+function delButtons(kind, id, label) {
+  const key = kind + ':' + id;
+  if (ui.del === key) return '<span class="row"><button class="btn danger" data-a="del-yes" data-v="' + key + '">Ja, ' + (label === 'Absagen' ? 'absagen' : 'löschen') + '</button><button class="btn quiet" data-a="del-no">Nein</button></span>';
+  return '<button class="btn quiet" data-a="del-ask" data-v="' + key + '">' + label + '</button>';
+}
+
+function contactHtml() {
+  const wa = CONFIG.whatsappUrl
+    ? '<a class="btn primary" href="' + esc(CONFIG.whatsappUrl) + '" target="_blank" rel="noopener">' + ic('chat') + 'WhatsApp-Gruppe öffnen</a>'
+    : '<button class="btn" disabled>' + ic('chat') + 'WhatsApp-Gruppe</button><span class="muted">Der Einladungslink wird noch eingetragen.</span>';
+  return '<section class="contact" aria-labelledby="ct-h"><h2 id="ct-h">Fragen oder Hilfe?</h2>' +
+    '<div class="stack"><span>E-Mail an die Admins:</span><span class="mail" id="mail">' + esc(CONFIG.adminEmail) + '</span>' +
+    '<div class="row"><a class="btn primary" href="mailto:' + esc(CONFIG.adminEmail) + '?subject=Oele51%20App">' + ic('mail') + 'E-Mail schreiben</a>' +
+    '<button class="btn" data-a="copymail">Adresse kopieren</button></div></div>' +
+    '<div class="row">' + wa + '</div></section>';
+}
+
+function startView() {
+  const t = today();
+  const freeWash = resOf(S.floor).slots.filter(s => !findBooking(S.floor, t, s.id)).length;
+  const grBusy = DAY3.filter(s => findBooking('gr', t, s.id)).length;
+  const nextEv = upcoming(S.events)[0];
+  const news = S.posts.slice().sort((a, b) => (b.important - a.important) || b.date.localeCompare(a.date))[0];
+  const tiles = [
+    ['raeume', 'Räume & Tische', grBusy ? 'Gemeinschaftsraum heute teilweise belegt' : 'Gemeinschaftsraum heute frei'],
+    ['waschen', 'Waschküche', resOf(S.floor).name + ': heute ' + freeWash + ' von 5 Zeiten frei'],
+    ['anlaesse', 'Anlässe', nextEv ? 'Nächster: ' + shortDate(nextEv.date) + ', ' + nextEv.title : 'Noch kein Anlass geplant'],
+    ['infos', 'Infotafel', news ? news.title : 'Keine Mitteilungen']
+  ];
+  return header('Grüezi, ' + S.user, 'Heute ist ' + longDate(t) + '.') +
+    '<p class="demo">Demo mit Beispieldaten. Einträge bleiben nur auf diesem Gerät.</p>' +
+    '<main class="stack" style="gap:24px">' +
+    '<div class="tiles">' + tiles.map(x =>
+      '<a class="tile" href="#' + x[0] + '"><span class="badge">' + ic(x[0]) + '</span><strong>' + esc(x[1]) + '</strong><span class="muted">' + esc(x[2]) + '</span></a>').join('') + '</div>' +
+    '<section class="stack" aria-labelledby="my-h"><h2 id="my-h">Meine Reservationen</h2>' + myBookingsHtml() + '</section>' +
+    contactHtml() +
+    '<p class="row muted"><span class="grow">Angemeldet als ' + esc(S.user) + '</span><button class="btn quiet" data-a="logout">Abmelden</button></p>' +
+    '</main>';
+}
+
+function bookingView(kind) {
+  const wash = kind === 'waschen';
+  const group = wash ? WASH : ROOMS;
+  const resId = wash ? S.floor : ui.room;
+  const res = resOf(resId);
+  const count = ui.more ? 21 : 7;
+  const days = Array.from({ length: count }, (_, i) => iso(addDays(i)));
+  if (!days.includes(ui.day)) ui.day = days[0];
+  let h = header(wash ? 'Waschküche reservieren' : 'Raum oder Tisch reservieren', wash ? 'Auf jedem Stock steht eine Waschmaschine. Waschen ist von 7 bis 22 Uhr erlaubt.' : 'Drei Schritte: auswählen, Tag antippen, Zeit antippen.');
+  h += '<main class="stack" style="gap:28px">';
+  h += '<section class="step"><h2><span class="num">1</span>' + (wash ? 'Welcher Stock?' : 'Was reservieren?') + '</h2><div class="choices">' +
+    group.map(r => '<button class="opt" data-a="res" data-v="' + r.id + '" aria-pressed="' + (r.id === resId) + '"><b>' + esc(r.name) + '</b><small>' + esc(r.hint) + '</small></button>').join('') + '</div></section>';
+  h += '<section class="step"><h2><span class="num">2</span>Welcher Tag?</h2><div class="days">' +
+    days.map((d, i) => '<button class="opt" data-a="day" data-v="' + d + '" aria-pressed="' + (d === ui.day) + '"><small>' + (i === 0 ? 'Heute' : esc(fmt(d, { weekday: 'short' }))) + '</small><b>' + esc(fmt(d, { day: 'numeric', month: 'numeric' })) + '</b></button>').join('') + '</div>' +
+    (ui.more ? '' : '<button class="btn quiet" data-a="more">Weitere Tage zeigen</button>') + '</section>';
+  h += '<section class="step"><h2><span class="num">3</span>Welche Zeit?</h2><p class="muted">' + esc((wash ? 'Waschmaschine ' : '') + res.name + ', ' + longDate(ui.day)) + '</p><div class="slots">' +
+    res.slots.map(s => {
+      const b = findBooking(resId, ui.day, s.id);
+      const label = '<span class="t">' + esc(s.name) + (s.time ? ' <span style="font-weight:400">· ' + esc(s.time) + '</span>' : '') + '</span>';
+      if (b && b.by === S.user) return '<div class="slot mine">' + label + '<span class="s">' + ic('check') + 'Meine Reservation</span></div>';
+      if (b) { const ev = b.ev && S.events.find(e => e.id === b.ev); return '<div class="slot taken">' + label + '<span class="s">Belegt · ' + esc(ev ? 'Anlass «' + ev.title + '»' : b.by) + '</span></div>'; }
+      const picked = ui.pick === s.id;
+      return '<button class="slot' + (picked ? ' picked' : '') + '" data-a="pick" data-v="' + s.id + '" aria-pressed="' + picked + '">' + label + '<span class="s">' + (picked ? ic('check') + 'Ausgewählt' : 'Frei') + '</span></button>';
+    }).join('') + '</div></section>';
+  if (ui.pick && slotOf(res, ui.pick) && !findBooking(resId, ui.day, ui.pick)) {
+    h += '<section class="confirm" id="confirm"><h2>Stimmt das so?</h2><p><b>' + esc((wash ? 'Waschmaschine ' : '') + res.name) + '</b><br>' + esc(longDate(ui.day)) + '<br>' + esc(slotLabel(res, ui.pick)) + '</p>' +
+      '<div class="row"><button class="btn primary grow" data-a="book">Jetzt reservieren</button><button class="btn quiet" data-a="unpick">Abbrechen</button></div></section>';
+  }
+  return h + '</main>';
+}
+
+function eventsView() {
+  let h = header('Anlässe', 'Gemeinsame Termine im Haus. Der Raum wird beim Speichern automatisch reserviert.');
+  h += '<main class="stack" style="gap:20px">';
+  if (ui.form === 'event') {
+    h += '<form id="evform" class="card" novalidate><h2>Neuer Anlass</h2>' +
+      '<div><label for="ev-title">Titel</label><input type="text" id="ev-title" maxlength="60"></div>' +
+      '<div><label for="ev-date">Tag</label><input type="date" id="ev-date" min="' + today() + '" value="' + iso(addDays(7)) + '"></div>' +
+      '<div><label for="ev-slot">Zeit</label><select id="ev-slot">' + DAY3.map(s => '<option value="' + s.id + '">' + s.name + ', ' + s.time + '</option>').join('') + '</select></div>' +
+      '<div><label for="ev-res">Ort</label><select id="ev-res">' + ROOMS.filter(r => r.slots === DAY3 && r.id[0] !== 't').map(r => '<option value="' + r.id + '">' + r.name + '</option>').join('') + '<option value="">Anderer Ort (ohne Reservation)</option></select></div>' +
+      '<div><label for="ev-desc">Beschreibung (freiwillig)</label><textarea id="ev-desc" maxlength="400"></textarea></div>' +
+      '<p class="err" id="ev-err" role="alert"></p>' +
+      '<div class="row"><button class="btn primary grow" type="submit">Anlass speichern</button><button class="btn quiet" type="button" data-a="form-close">Abbrechen</button></div></form>';
+  } else {
+    h += '<button class="btn primary wide" data-a="form-event">Neuen Anlass planen</button>';
+  }
+  const list = upcoming(S.events);
+  if (!list.length) h += '<p class="muted">Noch kein Anlass geplant.</p>';
+  h += list.map(e => {
+    const r = e.res && resOf(e.res); const going = e.going.includes(S.user);
+    return '<article class="card"><h2>' + esc(e.title) + '</h2><div class="meta">' +
+      '<span>' + ic('clock') + '<span><b>' + esc(longDate(e.date)) + '</b>, ' + esc(slotLabel({ slots: DAY3 }, e.slot)) + '</span></span>' +
+      '<span>' + ic('pin') + '<span>' + esc(r ? r.name + ' (reserviert)' : 'Anderer Ort') + '</span></span>' +
+      '<span>' + ic('user') + '<span>Organisiert von ' + esc(e.by) + '</span></span></div>' +
+      (e.desc ? '<p class="body">' + esc(e.desc) + '</p>' : '') +
+      '<p class="muted">' + (e.going.length === 1 ? '1 Person kommt' : e.going.length + ' Personen kommen') + (e.going.length ? ': ' + esc(e.going.join(', ')) : '') + '</p>' +
+      '<div class="row"><button class="btn ' + (going ? '' : 'primary') + ' grow" data-a="going" data-v="' + e.id + '" aria-pressed="' + going + '">' + (going ? ic('check') + 'Ich komme (antippen zum Abmelden)' : 'Ich komme') + '</button>' +
+      (e.by === S.user ? delButtons('event', e.id, 'Anlass absagen') : '') + '</div></article>';
+  }).join('');
+  return h + '</main>';
+}
+
+function postsView() {
+  let h = header('Infotafel', 'Mitteilungen für alle im Haus.');
+  h += '<main class="stack" style="gap:20px">';
+  if (ui.form === 'post') {
+    h += '<form id="postform" class="card" novalidate><h2>Neue Mitteilung</h2>' +
+      '<div><label for="po-title">Titel</label><input type="text" id="po-title" maxlength="80"></div>' +
+      '<div><label for="po-body">Text</label><textarea id="po-body" maxlength="800"></textarea></div>' +
+      '<label class="check"><input type="checkbox" id="po-imp"> Als wichtig markieren (steht zuoberst)</label>' +
+      '<p class="err" id="po-err" role="alert"></p>' +
+      '<div class="row"><button class="btn primary grow" type="submit">Mitteilung aufhängen</button><button class="btn quiet" type="button" data-a="form-close">Abbrechen</button></div></form>';
+  } else {
+    h += '<button class="btn primary wide" data-a="form-post">Neue Mitteilung schreiben</button>';
+  }
+  const list = S.posts.slice().sort((a, b) => (b.important - a.important) || b.date.localeCompare(a.date));
+  if (!list.length) h += '<p class="muted">Die Infotafel ist leer.</p>';
+  h += list.map(p => '<article class="card">' + (p.important ? '<span class="pill">WICHTIG</span>' : '') + '<h2>' + esc(p.title) + '</h2><p class="body">' + esc(p.body) + '</p>' +
+    '<div class="row"><span class="muted grow">' + esc(p.by) + ' · ' + esc(shortDate(p.date)) + '</span>' + (p.by === S.user ? delButtons('post', p.id, 'Löschen') : '') + '</div></article>').join('');
+  return h + '</main>';
+}
+
+function navHtml(cur) {
+  return '<nav class="bar" aria-label="Hauptmenü"><ul>' + NAV.map(n =>
+    '<li><a href="#' + n[0] + '"' + (n[0] === cur ? ' aria-current="page"' : '') + '>' + ic(n[0]) + '<span>' + n[1] + '</span></a></li>').join('') + '</ul></nav>';
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (!S.user) { app.className = 'login'; app.innerHTML = loginView(); return; }
+  const r = route();
+  app.className = '';
+  app.innerHTML = (r === 'start' ? startView() : r === 'raeume' || r === 'waschen' ? bookingView(r) : r === 'anlaesse' ? eventsView() : postsView()) + navHtml(r);
+}
+
+/* ---------- Actions ---------- */
+function removeByKey(key) {
+  const [kind, id] = key.split(':');
+  if (kind === 'booking') { S.bookings = S.bookings.filter(b => b.id !== id); toast('Reservation abgesagt'); }
+  if (kind === 'event') { S.events = S.events.filter(e => e.id !== id); S.bookings = S.bookings.filter(b => b.ev !== id); toast('Anlass abgesagt, Raum wieder frei'); }
+  if (kind === 'post') { S.posts = S.posts.filter(p => p.id !== id); toast('Mitteilung gelöscht'); }
+  save();
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]'); if (!el) return;
+  const a = el.dataset.a, v = el.dataset.v, r = route();
+  if (a === 'showpass') { document.getElementById('lg-pass').type = el.checked ? 'text' : 'password'; return; }
+  if (a === 'copymail') {
+    const done = () => toast('Adresse kopiert');
+    const fallback = () => { const range = document.createRange(); range.selectNodeContents(document.getElementById('mail')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); toast('Adresse ist markiert'); };
+    try { navigator.clipboard.writeText(CONFIG.adminEmail).then(done, fallback); } catch (err) { fallback(); }
+    return;
+  }
+  if (a === 'logout') { S.user = null; save(); location.hash = ''; }
+  else if (a === 'res') { if (r === 'waschen') { S.floor = v; save(); } else ui.room = v; ui.pick = null; }
+  else if (a === 'day') { ui.day = v; ui.pick = null; }
+  else if (a === 'more') ui.more = true;
+  else if (a === 'pick') ui.pick = ui.pick === v ? null : v;
+  else if (a === 'unpick') ui.pick = null;
+  else if (a === 'book') {
+    const resId = r === 'waschen' ? S.floor : ui.room;
+    if (!findBooking(resId, ui.day, ui.pick)) { S.bookings.push({ id: uid('b'), res: resId, date: ui.day, slot: ui.pick, by: S.user }); save(); toast('Reserviert für ' + shortDate(ui.day)); }
+    ui.pick = null;
+  }
+  else if (a === 'del-ask') ui.del = v;
+  else if (a === 'del-no') ui.del = null;
+  else if (a === 'del-yes') { removeByKey(v); ui.del = null; }
+  else if (a === 'form-event') ui.form = 'event';
+  else if (a === 'form-post') ui.form = 'post';
+  else if (a === 'form-close') ui.form = null;
+  else if (a === 'going') {
+    const ev = S.events.find(x => x.id === v); if (!ev) return;
+    if (ev.going.includes(S.user)) { ev.going = ev.going.filter(n => n !== S.user); toast('Abgemeldet'); } else { ev.going.push(S.user); toast('Angemeldet'); }
+    save();
+  }
+  render();
+  if (a === 'pick' && ui.pick) { const c = document.getElementById('confirm'); if (c) c.scrollIntoView({ block: 'nearest' }); }
+  if (a === 'form-event') document.getElementById('ev-title').focus();
+  if (a === 'form-post') document.getElementById('po-title').focus();
+});
+
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const val = id => document.getElementById(id).value.trim();
+  const fail = (id, msg) => { document.getElementById(id).textContent = msg; };
+  if (e.target.id === 'login') {
+    if (!val('lg-name') || !document.getElementById('lg-pass').value) return fail('lg-err', 'Bitte Benutzername und Passwort eingeben.');
+    S.user = val('lg-name'); save(); render(); scrollTo(0, 0);
+  }
+  if (e.target.id === 'evform') {
+    const title = val('ev-title'), date = val('ev-date'), slot = val('ev-slot'), res = val('ev-res');
+    if (!title) return fail('ev-err', 'Bitte einen Titel eingeben.');
+    if (!date || date < today()) return fail('ev-err', 'Bitte einen Tag ab heute wählen.');
+    const clash = res && findBooking(res, date, slot);
+    if (clash) return fail('ev-err', resOf(res).name + ' ist dann schon reserviert (' + clash.by + '). Bitte einen anderen Tag, eine andere Zeit oder einen anderen Ort wählen.');
+    const id = uid('e');
+    S.events.push({ id, title, date, slot, res: res || null, desc: val('ev-desc'), by: S.user, going: [S.user] });
+    if (res) S.bookings.push({ id: uid('b'), res, date, slot, by: S.user, ev: id });
+    save(); ui.form = null; render(); toast(res ? 'Anlass gespeichert, ' + resOf(res).name + ' reserviert' : 'Anlass gespeichert');
+  }
+  if (e.target.id === 'postform') {
+    if (!val('po-title') || !val('po-body')) return fail('po-err', 'Bitte Titel und Text eingeben.');
+    S.posts.push({ id: uid('p'), title: val('po-title'), body: val('po-body'), important: document.getElementById('po-imp').checked, by: S.user, date: today() });
+    save(); ui.form = null; render(); toast('Mitteilung hängt an der Infotafel');
+  }
+});
+
+addEventListener('hashchange', () => { ui.pick = null; ui.form = null; ui.del = null; ui.day = today(); render(); scrollTo(0, 0); });
+render();
+</script>
