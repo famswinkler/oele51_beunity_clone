@@ -1,103 +1,113 @@
 # Oele51 Hausverein app: plan
 
-Status: draft for the Hausverein, 14 Nov 2026.
-
-## Decided (14 Nov 2026)
-
-- Admins can add, edit and remove anything that can be reserved
-- Reservations are flexible: from 1 hour up to the whole day
-- One login per flat
-- The app says "Du"
-- Only admins post notices on the info board
-- The info board opens the start page, with the next event first and a picture if there is one
-- Admin email and WhatsApp link do not exist yet. Admins enter them later in the app
-- Washing machine reservations can repeat (every week or every 2 weeks), at most 4 months in advance
-- Only admins plan events. Events show on the info board
-- No limit per flat
-- Each device can set the text size (Normal, Gross, Sehr gross) and light or dark colours
-- Contrast is strong enough to read in bright light: near-black text on white, dark green buttons, clear borders
+Status 15 Nov 2026: the app works end to end (server, login, reservations, admin area). It is not hosted yet.
 
 ## Goal
 
 A small, fast app for the residents of Oele51 that replaces the current house app for four things only:
 
-1. Reserve rooms, tables and similar shared things
-2. Plan events, linked to the room reservation
+1. Reserve rooms, tables and other shared things
+2. Events, linked to the room reservation
 3. Reserve the washing machine on each of the 4 floors
-4. Read and post on an info board
+4. An info board
 
-Plus: one-time login, an email link to the admins, and a link to the WhatsApp group.
+Chat, marketplace, working groups and damage reports are out of scope. Chat moves to WhatsApp.
 
-Everything else the current app does (chat, marketplace, working groups, damage reports) is out of scope. Chat moves to WhatsApp.
+## Decided
+
+- Admins can add, edit, pause and remove anything that can be reserved
+- Reservations are flexible: from 1 hour up to the whole day. Admins set a minimum and maximum per thing
+- Washing machine reservations can repeat (every week or every 2 weeks), at most 4 months in advance
+- One login per flat. No limit per flat
+- Login with any email address or a short name, plus an initial password from the admin that the flat can change
+- The app says "Du"
+- Only admins post notices and plan events. Events show first on the info board, with a picture if there is one
+- The info board opens the start page
+- Admin email and WhatsApp link do not exist yet. Admins enter them later in the app
+- Each device can set the text size and light or dark colours. Contrast must stay readable in bright light
 
 ## Design rules (for senior residents)
 
 - Text at least 18 px, buttons at least 56 px high, strong contrast
-- Start page shows four large tiles and nothing hidden behind a menu
+- Start page shows the info board and three wide buttons. Nothing is hidden behind a menu
 - A bottom bar with icon and word is visible on every screen
-- A reservation takes few taps: what, day, first hour, last hour. Then one confirmation
-- Plain Swiss German words: Reservation, Anlass, Waschküche, Infotafel
-- Status is shown in words, not colour alone: "Frei", "Belegt · Name", "Meine Reservation"
+- Reserving takes three steps: what, day, time. Then one confirmation
+- Plain Swiss German words: Reservation, Anlass, Waschmaschine, Infotafel
+- Status is shown in words, not colour alone: "frei", "teils", "voll", "Meine Reservation"
 - Deleting always asks "Ja / Nein" first
-- Colours from the logo: sage green, charcoal, the peach of the balconies, on a light ground. Dark mode included
+- Colours from the logo: sage green, charcoal, the peach of the balconies. Dark mode included
 - Typeface: Atkinson Hyperlegible, made for readers with low vision
 
-## Screens
+## Login
 
-| Screen | What it does |
-|---|---|
-| Login | Logo, flat number, password, "show password". Stays logged in on the device |
-| Start | Info board first: next event with picture, further events, notices. Then three wide buttons to reserve, my reservations, contact block |
-| Räume | Pick a room, table or other thing, a day, the first and last hour (or "Ganzer Tag"), confirm |
-| Waschen | Pick the floor and day, then set "Von" and "Bis" with two wheels (or arrow buttons). Shows what is already taken that day. The app remembers the floor |
-| Anlässe | List of events with picture, "Wir kommen" button. Admins add events with automatic room reservation and clash warning |
-| Verwalten (admins) | Add, edit, delete what can be reserved. Set admin email and WhatsApp link |
+- The admin creates one account per flat: a name ("Wohnung 1.06"), a login (any email address or a short name like "1.06") and an initial password. The app can suggest one that is easy to type, such as "Linde-4821"
+- The flat logs in once per device and stays logged in for a year from the last use. Several devices per flat work at the same time
+- After the first login the start page offers "Eigenes Passwort wählen". The flat may keep the initial password
+- Forgotten password: an admin sets a new initial password. That logs the flat out on all devices
+- No email is ever sent, so no mail service is needed and a login never depends on one
+- Passwords are stored only as scrypt hashes. After 8 wrong tries a login is paused for 15 minutes
 
-A clickable prototype of all screens is in `prototype/index.html`. It uses example data stored only in the browser. Tick "Als Admin anmelden" on the login screen to see the admin area.
+## How double bookings are prevented
 
-## Rules built into the prototype
-
-- Every reservable thing has a name, a kind (Raum, Tisch, Waschmaschine, Anderes), an optional hint, opening hours, and a switch "whole day only"
-- Default hours are 07–22, as the house rules forbid washing 22:00–07:00. Admins can change them per thing
-- Reservations are in whole hours, 1 hour up to the whole day
-- Washing machines are named Erdgeschoss, 1. Stock, 2. Stock, 3. Stock (editable)
-- Guest room: whole day only
-- Admins plan and cancel events. Residents answer with "Wir kommen"
-- A repeating washing reservation skips dates that are already taken and says how many. It can be cancelled one date at a time or all at once
-- Prices shown as hints: community room CHF 20 per day for private events, guest room CHF 20 per night (WBG price list of 29.09.2025, to be confirmed)
-- An event that needs a room creates the reservation itself. Cancelling the event frees the room
-
-## Proposed technology
-
-| Part | Proposal | Why |
-|---|---|---|
-| App | Web app that can be added to the home screen (PWA). No app store | One version for phone, tablet and PC. Opens fast. Updates itself |
-| Code | Plain HTML, CSS and JavaScript, as in the prototype | Small download, quick on old phones |
-| Data and login | A hosted database with built-in login, for example Supabase with a Swiss or EU region | Little to maintain for volunteers. Region and cost need checking before deciding |
-| Login | Username and password. The session is kept on the device and renewed silently | Residents log in once per device |
-| Roles | Resident, admin | Admins manage users, rooms, slots, pinned notices |
-| Hosting | Static hosting with an own address, for example app.oele51.ch | Cheap and simple |
-
-Alternative: a small own server (Node and SQLite) at a Swiss host. More control, more upkeep.
+- The browser never decides whether a time is free. It asks the server
+- The server handles one change at a time. Checking that the time is free and saving it happen in one uninterrupted step, so two requests can never both pass the check
+- The second flat gets a clear message with who has the time, for example "Diese Zeit ist schon reserviert: 10–14 Uhr, Wohnung 1.06", and sees the updated day
+- Every open app is told at once when anything changes (a live connection, with a 30-second check as fallback). In the test, another flat's screen updated without reloading
+- The day buttons show "frei", "teils" or "voll" for the chosen thing, so taken days are visible before a day is opened
+- While someone is typing in a form, new data waits until the form is closed, so nothing they typed is lost
 
 ## Admin area
 
-In the prototype: manage reservable things, contact details, notices, cancel events.
+Six sections, all with add, edit and delete:
 
-Still to build: create flat logins, reset passwords, remove any reservation.
+| Section | What admins set |
+|---|---|
+| Reservierbares | Name, kind, hint (for example the price), earliest and latest hour, minimum and maximum duration, whole day only, how far ahead, whether it may repeat and for how many months, paused or active |
+| Anlässe | Title, day, time or whole day, place (reserved automatically), description, picture |
+| Infotafel | Notices, important ones on top |
+| Wohnungen | Accounts: name, login, role (Bewohner or Admin), initial password |
+| Reservationen | All upcoming reservations in the house, cancel any |
+| Kontakt | Admin email, WhatsApp invite link, sender name for notices |
 
-## Steps
+## Technology
 
-1. Review the prototype with a few residents, including seniors. Collect changes
-2. Decide the open questions below
-3. Build data storage, login and the admin area
-4. Test with one floor for two weeks
-5. Import residents, hand out logins, switch over
+| Part | Choice | Why |
+|---|---|---|
+| App | Web app that can be added to the home screen. No app store | One version for phone, tablet and PC. Updates itself |
+| Code | Plain HTML, CSS and JavaScript, no framework | Small download, quick on old phones |
+| Server | One Node.js program, no packages to install | Little to maintain, nothing to keep up to date except Node |
+| Rules | One file (`public/core.js`) holds every check. Server and demo both run it | The demo behaves exactly like the real app |
+| Data | One file on the server, written safely after every change, daily backup kept for 30 days | Simple to back up and move. Fits one building |
+
+Limits of this choice: it is built for one building and one server program. That is what makes double bookings impossible without a database. It would need a database if it ever had to serve many buildings.
+
+## Tested
+
+`npm test` starts a real server and checks, among others:
+
+- 20 flats reserve the same hours at the same moment: exactly one gets them
+- Overlapping times at the same moment never both succeed
+- A change reaches other logged-in flats without reloading
+- Minimum and maximum duration, the 4-month limit for repeats, skipping taken dates
+- Residents cannot use admin functions or cancel other flats' reservations
+- Password change, new initial password, data kept across a restart, passwords not stored readable
+
+Also run in real browsers: an admin and two flats at the same time, including two flats pressing "Jetzt reservieren" on the same hours.
+
+Not tested: picture upload, wheel feel on a real touch screen, contrast in sunlight, a real hosting setup.
+
+## Next steps
+
+1. Choose where to host it (see open questions) and put it online with an own address and HTTPS
+2. Review with a few residents, including seniors. Collect changes
+3. Admin creates the flat accounts and hands out initial passwords
+4. Test with one floor for two weeks, then switch over
 
 ## Open questions
 
-- Which rooms and tables exist? "Festtisch 1 / 2" are examples. Admins can now fix this in the app
-- Where should the data be hosted, and what yearly budget is acceptable?
+- Where should it be hosted, and what yearly budget is acceptable? It needs a place that runs a Node.js program all the time and keeps its data folder. A Swiss host is possible
+- Which address should the app have (for example app.oele51.ch)?
+- Which rooms and tables exist? "Festtisch 1 / 2" are examples. Admins can fix this in the app
 - Is the app in German only?
 
 ## Not checked
