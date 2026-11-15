@@ -1,0 +1,604 @@
+/* Oele51 app (browser side). Talks to the server, or to a built-in demo when window.OELE_DEMO is set. */
+(function () {
+'use strict';
+const core = window.OeleCore, CATS = core.CATS, pad = core.pad, span = core.span, hoursText = core.hoursText;
+const DEMO = !!window.OELE_DEMO;
+
+/* ---------- dates ---------- */
+const fromIso = s => { const a = s.split('-').map(Number); return new Date(a[0], a[1] - 1, a[2]); };
+const fmt = (s, opt) => new Intl.DateTimeFormat('de-CH', opt).format(fromIso(s));
+const longDate = s => fmt(s, { weekday: 'long', day: 'numeric', month: 'long' });
+const shortDate = s => fmt(s, { weekday: 'short', day: 'numeric', month: 'short' });
+const localIso = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+
+/* ---------- connection to the server ---------- */
+async function call(method, url, body) {
+  let r;
+  try { r = await fetch(url, { method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { throw Object.assign(new Error('Keine Verbindung. Bitte prüfe das Internet und versuche es nochmals.'), { status: 0 }); }
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) throw Object.assign(new Error(j.error || 'Das hat nicht geklappt. Bitte versuche es nochmals.'), { status: r.status });
+  return j;
+}
+const httpApi = {
+  state: () => call('GET', 'api/state'),
+  login: (login, password) => call('POST', 'api/login', { login, password }),
+  logout: () => call('POST', 'api/logout', {}),
+  act: (name, p) => call('POST', 'api/act', { name, p }),
+  /* Live updates. The stream only opens for a logged-in flat, so it is (re)opened whenever needed. */
+  listen(cb) {
+    let es = null;
+    const connect = () => { if (!D || (es && es.readyState !== 2)) return; try { es = new EventSource('api/stream'); es.onmessage = cb; } catch (e) {} };
+    this.wake = connect; connect();
+    setInterval(() => { connect(); cb(); }, 30000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { connect(); cb(); } });
+  }
+};
+
+/* ---------- demo: the same rules, running in this browser only ---------- */
+function demoApi() {
+  const KEY = 'oele51-demo-v5', hash = p => 'demo:' + p, verify = (p, h) => h === 'demo:' + p;
+  let s = null;
+  function make() {
+    const t = localIso(), d = n => core.addDays(t, n), x = core.seed();
+    const U = (login, name, role) => { const id = 'u' + (x.seq++); x.users.push({ id, login, name, role: role || 'resident', pw: hash('oele51'), initial: login === '1.06' }); return id; };
+    const ad = U('admin', 'Vorstand', 'admin'), a = U('1.06', 'Wohnung 1.06'), b = U('1.02', 'Wohnung 1.02'), c = U('2.03', 'Wohnung 2.03'), e = U('3.04', 'Wohnung 3.04');
+    const R = n => x.resources.find(r => r.name === n).id, B = (res, day, from, to, user, more) => x.bookings.push(Object.assign({ id: 'b' + (x.seq++), res: R(res), date: d(day), from, to, user }, more || {}));
+    x.events.push({ id: 'e1', title: 'Spielnachmittag', date: d(3), from: 14, to: 17, all: false, res: R('Gemeinschaftsraum'), desc: 'Jassen, Brettspiele, Kaffee und Kuchen. Alle sind willkommen.', img: '', user: ad, going: [b, c] });
+    x.events.push({ id: 'e2', title: 'Apéro im Gemeinschaftsraum', date: d(9), from: 17, to: 20, all: false, res: R('Gemeinschaftsraum'), desc: 'Jede Wohnung bringt etwas Kleines mit.', img: '', user: ad, going: [b] });
+    B('Gemeinschaftsraum', 3, 14, 17, ad, { ev: 'e1' }); B('Gemeinschaftsraum', 9, 17, 20, ad, { ev: 'e2' }); B('Gemeinschaftsraum', 1, 18, 22, b);
+    B('1. Stock', 1, 9, 12, b); B('1. Stock', 1, 15, 16, c);
+    [[7, 10, b], [10, 13, c], [13, 16, e], [16, 19, b], [19, 22, c]].forEach(x2 => B('1. Stock', 2, x2[0], x2[1], x2[2]));   // a fully booked day
+    B('Gästezimmer', 5, 7, 22, c); B('Festbankgarnituren', 6, 7, 22, e);
+    x.posts.push({ id: 'p1', title: 'Willkommen in der neuen Oele51-App', body: 'Hier kannst du Räume, Material und die Waschmaschine reservieren und siehst, was im Haus läuft.', important: true, by: 'Vorstand', date: d(0) });
+    x.posts.push({ id: 'p2', title: 'Ruhezeiten', body: 'Von 22 bis 7 Uhr bitte nicht waschen oder tumblern (Hausordnung).', important: false, by: 'Vorstand', date: d(-2) });
+    x.demoUser = null; return x;
+  }
+  const load = () => { if (s) return s; try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} return (s = s || make()); };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+  const ctx = () => { const u = load().users.find(x => x.id === s.demoUser); if (!u) throw Object.assign(new Error('Bitte melde dich an.'), { status: 401 }); return { user: u, today: localIso(), nowHour: new Date().getHours(), hash, verify }; };
+  return {
+    state: async () => core.view(load(), ctx()),
+    login: async (login, password) => { const u = core.findUser(load(), login); if (!u || !verify(password, u.pw)) throw Object.assign(new Error('Benutzername oder Passwort stimmt nicht.'), { status: 401 }); s.demoUser = u.id; save(); },
+    logout: async () => { load().demoUser = null; save(); },
+    act: async (name, p) => { const c = ctx(), result = core.act(s, c, name, JSON.parse(JSON.stringify(p || {}))); save(); return { result, state: core.view(s, c) }; },
+    listen() {}, wake() {}
+  };
+}
+const api = DEMO ? demoApi() : httpApi;
+
+/* ---------- state ---------- */
+let D = null, booted = false;
+const ui = { res: {}, day: null, page: 0, sel: null, rep: { every: 0, months: 4 }, form: null, edit: null, del: null, img: undefined, disp: false, tab: 'res', stale: false };
+
+const P = (() => { const d = { size: 0, theme: 'auto' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('oele51-display') || '{}')); } catch (e) { return d; } })();
+const hostTheme = document.documentElement.getAttribute('data-theme');
+function applyP() {
+  const de = document.documentElement;
+  de.style.fontSize = ['100%', '118%', '136%'][P.size] || '100%';
+  if (P.theme === 'light' || P.theme === 'dark') de.setAttribute('data-theme', P.theme);
+  else if (hostTheme) de.setAttribute('data-theme', hostTheme); else de.removeAttribute('data-theme');
+}
+function saveP() { applyP(); try { localStorage.setItem('oele51-display', JSON.stringify(P)); } catch (e) {} }
+applyP();
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ICONS = {
+  start: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/>',
+  reservieren: '<rect x="4" y="3" width="13" height="18" rx="1"/><path d="M17 21h3"/><circle cx="13.5" cy="12" r=".6"/>',
+  waschen: '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="13.5" r="4.5"/><path d="M7.5 6.5h2"/>',
+  anlaesse: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15.5 2 2 4-4"/>',
+  verwalten: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  board: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6.5L20.5 7"/>',
+  pin: '<path d="M12 21s6-5.6 6-10.5a6 6 0 1 0-12 0C6 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.5 3.6-5 7-5s6.2 1.5 7 5"/>'
+};
+const ic = n => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>';
+const admin = () => D && D.me.role === 'admin';
+const navItems = () => [['start', 'Start'], ['anlaesse', 'Anlässe'], ['waschen', 'Waschen'], ['reservieren', 'Räume']].concat(admin() ? [['verwalten', 'Admin']] : []);
+const route = () => { const h = location.hash.slice(1); return navItems().some(n => n[0] === h) ? h : 'start'; };
+const resOf = id => D.resources.find(r => r.id === id);
+const resLabel = r => r ? (r.cat === 'wasch' ? 'Waschmaschine ' + r.name : r.name) : 'Gelöscht';
+const isFree = (res, date, from, to) => !D.bookings.some(b => b.res === res && b.date === date && b.from < to && from < b.to);
+const timeLabel = (x, r) => x.all || (r && x.from <= r.open && x.to >= r.close) ? 'Ganzer Tag' : span(x.from, x.to);
+const byTime = (a, b) => (a.date + pad(a.from)).localeCompare(b.date + pad(b.from));
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const selectHtml = (id, list, cur) => '<select id="' + id + '">' + list.map(x => '<option value="' + esc(x[0]) + '"' + (String(x[0]) === String(cur) ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('') + '</select>';
+const hourList = (lo, hi) => { const a = []; for (let i = lo; i <= hi; i++) a.push([i, pad(i) + ':00']); return a; };
+const field = (id, label, inner, hint) => '<div><label for="' + id + '">' + label + (hint ? ' <small>(' + hint + ')</small>' : '') + '</label>' + inner + '</div>';
+const input = (id, value, type, extra) => '<input type="' + (type || 'text') + '" id="' + id + '" value="' + esc(value || '') + '"' + (extra || '') + '>';
+const check = (id, label, on) => '<label class="check"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
+const optsRow = (a, cur, list) => '<div class="row">' + list.map(x => '<button class="opt" data-a="' + a + '" data-v="' + x[0] + '" aria-pressed="' + (String(cur) === String(x[0])) + '"><b>' + x[1] + '</b></button>').join('') + '</div>';
+let toastTimer;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 5000); }
+function delButtons(kind, id, label, yes) {
+  const key = kind + ':' + id;
+  if (ui.del === key) return '<span class="row"><button class="btn danger" data-a="del-yes" data-v="' + key + '">' + yes + '</button><button class="btn quiet" data-a="del-no">Nein</button></span>';
+  return '<button class="btn quiet" data-a="del-ask" data-v="' + key + '">' + label + '</button>';
+}
+
+/* ---------- shared pieces ---------- */
+const dispButton = () => '<button class="btn quiet disp" data-a="disp" aria-expanded="' + ui.disp + '"><b aria-hidden="true">Aa</b>Anzeige</button>';
+function dispPanel() {
+  return '<section class="card" aria-labelledby="dp-h"><h2 id="dp-h">Anzeige</h2>' +
+    '<div class="stack"><b>Schriftgrösse</b>' + optsRow('size', P.size, [[0, 'Normal'], [1, 'Gross'], [2, 'Sehr gross']]) + '</div>' +
+    '<div class="stack"><b>Farben</b>' + optsRow('theme', P.theme, [['light', 'Hell'], ['dark', 'Dunkel'], ['auto', 'Wie das Gerät']]) + '</div>' +
+    '<button class="btn primary" data-a="disp">Fertig</button></section>';
+}
+function header(title, lead) {
+  return '<header class="top"><span class="plate"><img src="logo-mark.jpg" alt=""></span>' +
+    '<span class="name">Oele51<small>Hausverein</small></span>' + dispButton() + '</header>' + (ui.disp ? dispPanel() : '') +
+    (title ? '<div class="hello"><h1>' + esc(title) + '</h1>' + (lead ? '<p class="muted">' + esc(lead) + '</p>' : '') + '</div>' : '');
+}
+
+function loginView() {
+  return '<main class="loginbox">' + dispButton() + (ui.disp ? dispPanel() : '') +
+    '<span class="logo"><img src="logo.jpg" alt="Oele51 Hausverein"></span>' +
+    '<div class="stack"><h1>Willkommen zu Hause</h1><p class="muted">Schau, was im Haus läuft, und reserviere Räume, Tische und die Waschmaschine.</p></div>' +
+    '<form id="login" class="stack" novalidate>' +
+      field('lg-name', 'E-Mail oder Benutzername', input('lg-name', '', 'text', ' autocomplete="username" autocapitalize="none" spellcheck="false"')) +
+      field('lg-pass', 'Passwort', input('lg-pass', '', 'password', ' autocomplete="current-password"')) +
+      '<label class="check"><input type="checkbox" id="lg-show" data-a="showpass" data-v="lg-pass"> Passwort anzeigen</label>' +
+      '<p class="err" id="lg-err" role="alert"></p>' +
+      '<button class="btn primary wide" type="submit">Anmelden</button>' +
+      '<p class="muted">Du meldest dich nur einmal an. Danach öffnet sich die App auf diesem Gerät direkt.</p>' +
+      '<p class="muted">Passwort vergessen? Sag es den Admins. Sie geben dir ein neues.</p>' +
+    '</form>' +
+    (DEMO ? '<p class="demo">Demo. Benutzername <b>1.06</b> (Wohnung) oder <b>admin</b>, Passwort <b>oele51</b>.</p>' : '') +
+    '</main>';
+}
+
+function eventHtml(e) {
+  const r = e.res && resOf(e.res);
+  return '<article class="event">' + (e.img ? '<img class="pic" src="' + esc(e.img) + '" alt="">' : '<div class="pic ph">' + ic('anlaesse') + '</div>') +
+    '<h3>' + esc(e.title) + '</h3><div class="meta">' +
+    '<span>' + ic('clock') + '<span><b>' + esc(longDate(e.date)) + '</b>, ' + esc(timeLabel(e, null)) + '</span></span>' +
+    '<span>' + ic('pin') + '<span>' + esc(r ? r.name : 'Anderer Ort') + '</span></span>' +
+    '<span>' + ic('user') + '<span>Organisiert von ' + esc(e.by) + '</span></span></div>' +
+    (e.desc ? '<p class="body">' + esc(e.desc) + '</p>' : '') +
+    '<p class="muted">' + (e.going === 1 ? '1 Wohnung kommt' : e.going + ' Wohnungen kommen') + '</p>' +
+    '<button class="btn ' + (e.iGo ? '' : 'primary') + ' wide" data-a="going" data-v="' + e.id + '" aria-pressed="' + e.iGo + '">' + (e.iGo ? ic('check') + 'Wir kommen (antippen zum Abmelden)' : 'Wir kommen') + '</button></article>';
+}
+
+function boardHtml() {
+  const evs = D.events.slice().sort(byTime);
+  const posts = D.posts.slice().sort((a, b) => (b.important - a.important) || b.date.localeCompare(a.date));
+  let h = '<section class="board" aria-labelledby="bd-h"><h2 id="bd-h">' + ic('board') + 'Infotafel</h2>';
+  if (evs.length) {
+    h += eventHtml(evs[0]);
+    if (evs.length > 1) h += '<div class="note"><h3>Danach</h3><ul class="list">' + evs.slice(1, 4).map(e =>
+      '<li><div class="grow"><div class="when">' + esc(shortDate(e.date)) + ' · ' + esc(timeLabel(e, null)) + '</div><div>' + esc(e.title) + '</div></div></li>').join('') +
+      '</ul><a class="btn" href="#anlaesse">Alle Anlässe ansehen</a></div>';
+  } else h += '<p class="muted">Im Moment ist kein Anlass geplant.</p>';
+  h += posts.map(p => '<article class="note">' + (p.important ? '<span class="pill">WICHTIG</span>' : '') + '<h3>' + esc(p.title) + '</h3><p class="body">' + esc(p.body) + '</p>' +
+    '<span class="muted">' + esc(p.by) + ' · ' + esc(shortDate(p.date)) + '</span></article>').join('');
+  if (admin()) h += '<div class="note row"><button class="btn grow" data-a="goto" data-v="posts">Mitteilungen bearbeiten</button><button class="btn grow" data-a="goto" data-v="events">Anlässe bearbeiten</button></div>';
+  return h + '</section>';
+}
+
+function bookingRows(list, forAdmin) {
+  const seen = {};
+  const rows = list.filter(b => !b.series || (seen[b.series] ? false : (seen[b.series] = true)));
+  return '<ul class="list">' + rows.map(b => {
+    const r = resOf(b.res), ev = b.ev && D.events.find(e => e.id === b.ev);
+    const rest = b.series ? list.filter(x => x.series === b.series) : [b], many = rest.length > 1;
+    return '<li><div class="grow"><div class="when">' + esc(shortDate(b.date)) + ' · ' + esc(timeLabel(b, r)) + '</div>' +
+      '<div>' + esc(resLabel(r)) + (forAdmin ? ' · ' + esc(b.by) : '') + (ev ? ' · Anlass «' + esc(ev.title) + '»' : '') + '</div>' +
+      (many ? '<div class="muted">Wiederholt sich ' + (b.every === 2 ? 'alle 2 Wochen' : 'jede Woche') + ' bis ' + esc(shortDate(rest[rest.length - 1].date)) + ' (noch ' + rest.length + ' Termine)</div>' : '') + '</div>' +
+      (ev ? '' : '<span class="row">' + delButtons('booking', b.id, many ? 'Nur diesen absagen' : 'Absagen', 'Ja, absagen') +
+        (many ? delButtons('series', b.series, 'Alle absagen', 'Ja, alle ' + rest.length + ' absagen') : '') + '</span>') + '</li>';
+  }).join('') + '</ul>';
+}
+
+function contactHtml() {
+  const c = D.settings;
+  let h = '<section class="contact" aria-labelledby="ct-h"><h2 id="ct-h">Fragen oder Hilfe?</h2>';
+  h += c.email
+    ? '<div class="stack"><span>E-Mail an die Admins:</span><span class="mail" id="mail">' + esc(c.email) + '</span>' +
+      '<div class="row"><a class="btn primary" href="mailto:' + esc(c.email) + '?subject=Oele51%20App">' + ic('mail') + 'E-Mail schreiben</a><button class="btn" data-a="copymail">Adresse kopieren</button></div></div>'
+    : '<div class="row"><button class="btn" disabled>' + ic('mail') + 'E-Mail an die Admins</button><span class="muted">Die Adresse folgt noch.</span></div>';
+  return h + '</section>';
+}
+
+function accountHtml() {
+  if (ui.form === 'pw') return '<form id="pwform" class="card" novalidate><h2>Passwort ändern</h2>' +
+    field('pw-old', 'Bisheriges Passwort', input('pw-old', '', 'password', ' autocomplete="current-password"')) +
+    field('pw-new', 'Neues Passwort', input('pw-new', '', 'password', ' autocomplete="new-password"'), 'mindestens 6 Zeichen') +
+    '<label class="check"><input type="checkbox" data-a="showpass" data-v="pw-old,pw-new"> Passwörter anzeigen</label>' +
+    '<p class="err" id="pw-err" role="alert"></p>' +
+    '<div class="row"><button class="btn primary grow" type="submit">Neues Passwort speichern</button><button class="btn quiet" type="button" data-a="form-close">Abbrechen</button></div></form>';
+  return '<section class="stack" aria-labelledby="ac-h"><h2 id="ac-h">Mein Konto</h2><p>Angemeldet als <b>' + esc(D.me.name) + '</b>' + (admin() ? ' (Admin)' : '') + '<br><span class="muted">' + esc(D.me.login) + '</span></p>' +
+    '<div class="row"><button class="btn grow" data-a="form" data-v="pw">Passwort ändern</button><button class="btn quiet" data-a="logout">Abmelden</button></div></section>';
+}
+
+function startView() {
+  const tiles = [
+    ['anlaesse', 'Anlässe ansehen', 'Was im Haus geplant ist'],
+    ['waschen', 'Waschmaschine reservieren', 'Einmal oder jede Woche'],
+    ['reservieren', 'Raum oder Material reservieren', D.resources.filter(r => r.active && r.cat !== 'wasch').map(r => r.name).join(', ')]
+  ];
+  const mine = D.bookings.filter(b => b.mine).sort(byTime);
+  return header('Willkommen im Oele51', D.me.name + ' · ' + longDate(D.today)) +
+    '<main>' +
+    (D.me.initial && ui.form !== 'pw' ? '<div class="confirm"><p><b>Du benutzt noch das Startpasswort.</b> Wähle ein eigenes, das nur du kennst.</p><button class="btn primary" data-a="form" data-v="pw">Eigenes Passwort wählen</button></div>' : '') +
+    (ui.form === 'pw' ? accountHtml() : '') +
+    boardHtml() +
+    '<nav class="tiles" aria-label="Reservieren">' + tiles.map(x =>
+      '<a class="tile" href="#' + x[0] + '"><span class="badge">' + ic(x[0]) + '</span><span class="txt"><strong>' + esc(x[1]) + '</strong><span class="muted">' + esc(x[2]) + '</span></span></a>').join('') + '</nav>' +
+    '<section class="stack" aria-labelledby="my-h"><h2 id="my-h">Meine Reservationen</h2>' + (mine.length ? bookingRows(mine) : '<p class="muted">Du hast noch nichts reserviert.</p>') + '</section>' +
+    contactHtml() + (ui.form === 'pw' ? '' : accountHtml()) +
+    (DEMO ? '<p class="demo">Demo mit Beispieldaten. Einträge bleiben nur auf diesem Gerät.</p>' : '') +
+    '</main>';
+}
+
+/* ---------- reserving ---------- */
+const WH = 56;
+const loOf = r => ui.day === D.today ? Math.max(r.open, D.nowHour + 1) : r.open;
+function dayState(r, d) {
+  const bs = D.bookings.filter(b => b.res === r.id && b.date === d);
+  if (r.dayOnly) return bs.length ? 'voll' : 'frei';
+  const lo = d === D.today ? Math.max(r.open, D.nowHour + 1) : r.open;
+  let run = 0, best = 0;
+  for (let h = lo; h < r.close; h++) { run = bs.some(b => b.from <= h && h < b.to) ? 0 : run + 1; best = Math.max(best, run); }
+  return best < r.minH ? 'voll' : bs.length ? 'teils' : 'frei';
+}
+function wheelHtml(id, label, vals, cur) {
+  return '<div class="wheelbox"><b id="' + id + '-l">' + label + '</b>' +
+    '<button class="btn quiet" data-a="wstep" data-v="' + id + ':-1" aria-label="' + label + ' eine Stunde früher">' + ic('up') + '</button>' +
+    '<div class="wheel" id="' + id + '" role="listbox" tabindex="0" aria-labelledby="' + id + '-l" data-vals="' + vals.join(',') + '">' +
+    vals.map(v => '<div class="wi' + (v === cur ? ' on' : '') + '" role="option" aria-selected="' + (v === cur) + '" data-a="wpick" data-v="' + id + ':' + v + '">' + pad(v) + ':00</div>').join('') + '</div>' +
+    '<button class="btn quiet" data-a="wstep" data-v="' + id + ':1" aria-label="' + label + ' eine Stunde später">' + ic('down') + '</button></div>';
+}
+function setWheel(id, v) {
+  const r = resOf(ui.res[route()]); if (!r || !ui.sel) return false;
+  const lo = loOf(r), min = r.minH, max = r.maxH || 99; let from = ui.sel.from, to = ui.sel.to;
+  if (id === 'wf') { from = clamp(v, lo, r.close - min); to = Math.min(r.close, from + clamp(to - from, min, max)); }
+  else { to = clamp(v, lo + min, r.close); if (to - from < min) from = to - min; if (to - from > max) from = to - max; from = Math.max(from, lo); }
+  const changed = from !== ui.sel.from || to !== ui.sel.to; ui.sel = { from, to }; return changed;
+}
+function syncWheels() {
+  document.querySelectorAll('.wheel').forEach(w => { const on = w.querySelector('.on'); w.scrollTop = on ? Array.prototype.indexOf.call(w.children, on) * WH : 0; });
+}
+function occurrences(r) {
+  const out = [ui.day]; if (!ui.rep.every || !r.repeat) return out;
+  const lim = core.addMonths(D.today, Math.min(ui.rep.months, r.repeatMonths));
+  for (let d = core.addDays(ui.day, 7 * ui.rep.every); d <= lim; d = core.addDays(d, 7 * ui.rep.every)) out.push(d);
+  return out;
+}
+function repeatHtml(r) {
+  const occ = occurrences(r), months = [1, 2, 3, 4, 6, 9, 12].filter(m => m <= r.repeatMonths);
+  return '<div class="stack"><b>Wiederholen?</b>' + optsRow('rep', ui.rep.every, [[0, 'Nur dieses Mal'], [1, 'Jede Woche'], [2, 'Alle 2 Wochen']]) +
+    (ui.rep.every ? '<b>Wie lange?</b>' + optsRow('repm', Math.min(ui.rep.months, r.repeatMonths), months.map(m => [m, m === 1 ? '1 Monat' : m + ' Monate'])) +
+      '<p>' + occ.length + ' Termine, der letzte am ' + esc(longDate(occ[occ.length - 1])) + '. Mehr als ' + (r.repeatMonths === 1 ? '1 Monat' : r.repeatMonths + ' Monate') + ' im Voraus geht nicht.</p>' : '') + '</div>';
+}
+
+function bookingView(kind) {
+  const wash = kind === 'waschen';
+  const group = D.resources.filter(r => r.active && (r.cat === 'wasch') === wash);
+  let h = header(wash ? 'Waschmaschine reservieren' : 'Raum oder Material reservieren', 'Drei Schritte: auswählen, Tag antippen, Zeit einstellen.');
+  if (!group.length) return h + '<main><p class="muted">Hier ist noch nichts eingerichtet.' + (admin() ? ' Im Admin-Bereich kannst du etwas hinzufügen.' : '') + '</p></main>';
+  let resId = ui.res[kind]; if (!resId) { try { resId = localStorage.getItem('oele51-last-' + kind); } catch (e) {} }
+  if (!group.some(r => r.id === resId)) resId = group[0].id;
+  ui.res[kind] = resId;
+  const r = resOf(resId), last = core.addDays(D.today, r.aheadDays);
+  if (!ui.day || ui.day < D.today) ui.day = D.today;
+  if (ui.day > last) { ui.day = D.today; ui.page = 0; }
+  const days = []; for (let i = 0; i < 14; i++) { const d = core.addDays(D.today, ui.page * 14 + i); if (d <= last) days.push(d); }
+  if (!days.includes(ui.day)) { ui.day = days[0]; ui.sel = null; }
+
+  h += '<main>';
+  h += '<section class="step"><h2><span class="num">1</span>' + (wash ? 'Welcher Stock?' : 'Was möchtest du reservieren?') + '</h2><div class="choices' + (group.some(x => x.img) ? ' pics' : '') + '">' +
+    group.map(x => '<button class="opt res-opt" data-a="res" data-v="' + x.id + '" aria-pressed="' + (x.id === resId) + '">' + (x.img ? '<img class="thumb" src="' + esc(x.img) + '" alt="">' : '') + '<b>' + esc(x.name) + '</b><small>' + esc(x.hint || CATS[x.cat]) + '</small></button>').join('') + '</div></section>';
+
+  h += '<section class="step"><h2><span class="num">2</span>An welchem Tag?</h2><div class="days">' +
+    days.map(d => { const st = dayState(r, d); return '<button class="opt day-' + st + '" data-a="day" data-v="' + d + '" aria-pressed="' + (d === ui.day) + '"><small>' + (d === D.today ? 'Heute' : esc(fmt(d, { weekday: 'short' }))) + '</small><b>' + esc(fmt(d, { day: 'numeric', month: 'numeric' })) + '</b><small class="st">' + st + '</small></button>'; }).join('') + '</div>' +
+    '<p class="legend"><span><i class="sw frei"></i>frei: noch alles offen</span><span><i class="sw teils"></i>teils: ein Teil ist reserviert</span><span><i class="sw voll"></i>voll: nichts mehr frei</span></p>' +
+    '<div class="row">' + (ui.page > 0 ? '<button class="btn quiet grow" data-a="page" data-v="-1">Frühere Tage</button>' : '') +
+    (core.addDays(D.today, (ui.page + 1) * 14) <= last ? '<button class="btn quiet grow" data-a="page" data-v="1">Spätere Tage</button>' : '') + '</div></section>';
+
+  const lo = loOf(r), taken = D.bookings.filter(b => b.res === resId && b.date === ui.day).sort(byTime);
+  const dayFree = !taken.length, dayFull = dayState(r, ui.day) === 'voll', fits = r.dayOnly ? true : !dayFull;
+  if (!r.dayOnly && fits && (!ui.sel || ui.sel.from < lo || ui.sel.to > r.close || ui.sel.to - ui.sel.from < r.minH)) {
+    let f = lo; while (f + r.minH < r.close && !isFree(resId, ui.day, f, f + r.minH)) f++;
+    ui.sel = { from: f, to: f + r.minH };
+  }
+  if (r.dayOnly && ui.sel && !(ui.sel.from === r.open && ui.sel.to === r.close)) ui.sel = null;
+  const sel = ui.sel, full = sel && sel.from === r.open && sel.to === r.close;
+
+  h += '<section class="step"><h2><span class="num">3</span>Von wann bis wann?</h2>';
+  h += '<div class="stack"><b>Schon reserviert am ' + esc(longDate(ui.day)) + '</b>' + (taken.length
+    ? '<ul class="list">' + taken.map(b => { const ev = b.ev && D.events.find(e => e.id === b.ev); return '<li><span class="when">' + esc(timeLabel(b, r)) + '</span><span>' + esc(b.mine && !ev ? 'Meine Reservation' : ev ? 'Anlass «' + ev.title + '»' : b.by) + '</span></li>'; }).join('') + '</ul>'
+    : '<p class="muted">Noch nichts. Der ganze Tag ist frei.</p>') + '</div>';
+  if (r.dayOnly) {
+    h += (dayFree ? '<p class="muted">' + esc(resLabel(r)) + ' gibt es nur für den ganzen Tag.</p>' : '<p class="full-note">An diesem Tag ist ' + esc(r.name) + ' schon reserviert. Wähle einen anderen Tag.</p>') +
+      (dayFree ? '<button class="slot' + (full ? ' picked' : '') + '" data-a="allday" aria-pressed="' + !!full + '"><span class="t">Ganzer Tag</span><span class="s">' + (full ? ic('check') + 'Ausgewählt' : 'Frei') + '</span></button>' : '');
+  } else if (!fits) {
+    h += '<p class="full-note">An diesem Tag ist nichts mehr frei. Wähle einen anderen Tag.</p>';
+  } else {
+    const fv = [], tv = []; for (let i = lo; i <= r.close - r.minH; i++) fv.push(i); for (let i = lo + r.minH; i <= r.close; i++) tv.push(i);
+    const clash = taken.filter(b => b.from < sel.to && sel.from < b.to);
+    const limits = (r.minH > 1 ? 'Mindestens ' + hoursText(r.minH) + '. ' : '') + (r.maxH ? 'Höchstens ' + hoursText(r.maxH) + ' am Stück.' : '');
+    h += '<p class="muted">Dreh an den Rädern oder tippe auf die Pfeile. ' + limits + '</p>' +
+      '<div class="wheels">' + wheelHtml('wf', 'Von', fv, sel.from) + wheelHtml('wt', 'Bis', tv, sel.to) + '</div>' +
+      '<p class="dur"><b>' + span(sel.from, sel.to) + '</b> · ' + hoursText(sel.to - sel.from) + '</p>' +
+      (dayFree && lo === r.open && !r.maxH ? '<button class="btn' + (full ? ' primary' : '') + '" data-a="allday">' + (full ? ic('check') : '') + 'Ganzer Tag (' + span(r.open, r.close) + ')</button>' : '') +
+      (clash.length ? '<p class="err">In dieser Zeit ist schon reserviert (' + clash.map(b => span(b.from, b.to)).join(', ') + '). Wähle eine andere Zeit.</p>' : '');
+  }
+  h += '</section>';
+  if (sel && fits && isFree(resId, ui.day, sel.from, sel.to)) {
+    h += '<section class="confirm" id="confirm"><h2>Stimmt das so?</h2><p><b>' + esc(resLabel(r)) + '</b><br>' + esc(longDate(ui.day)) + '<br>' +
+      esc(full ? 'Ganzer Tag' : span(sel.from, sel.to) + ' (' + hoursText(sel.to - sel.from) + ')') + '</p>' + (r.repeat ? repeatHtml(r) : '') +
+      '<button class="btn primary wide" data-a="book">Jetzt reservieren</button></section>';
+  }
+  return h + '</main>';
+}
+
+function eventsView() {
+  const list = D.events.slice().sort(byTime);
+  return header('Anlässe', 'Gemeinsame Termine im Haus. Sag mit «Wir kommen» Bescheid, wenn ihr dabei seid.') + '<main>' +
+    (admin() ? '<button class="btn wide" data-a="goto" data-v="events">Anlässe bearbeiten</button>' : '') +
+    (list.length ? list.map(e => '<div class="card">' + eventHtml(e) + '</div>').join('') : '<p class="muted">Im Moment ist kein Anlass geplant.</p>') + '</main>';
+}
+
+/* ---------- admin area ---------- */
+const TABS = [['res', 'Reservierbares'], ['events', 'Anlässe'], ['posts', 'Infotafel'], ['users', 'Wohnungen'], ['bookings', 'Reservationen'], ['contact', 'Kontakt']];
+const formButtons = label => '<div class="row"><button class="btn primary grow" type="submit">' + label + '</button><button class="btn quiet" type="button" data-a="edit-close">Abbrechen</button></div>';
+const editing = kind => ui.edit && ui.edit.kind === kind ? ui.edit : null;
+function picField(pre, cur) {
+  const src = ui.img === undefined ? cur : ui.img;
+  return field(pre + '-img', 'Bild', '<input type="file" id="' + pre + '-img" accept="image/*">', 'freiwillig') +
+    '<img id="' + pre + '-prev" class="prev" alt=""' + (src ? ' src="' + esc(src) + '"' : ' hidden') + '>' +
+    '<button class="btn quiet" type="button" data-a="img-clear" data-v="' + pre + '"' + (src ? '' : ' hidden') + '>Bild entfernen</button>';
+}
+const addButton = (kind, label) => '<button class="btn primary wide" data-a="edit" data-v="' + kind + ':new">' + label + '</button>';
+
+function adminRes() {
+  const ed = editing('res'); let h = '<p class="muted">Alles, was reserviert werden kann. Du kannst jederzeit etwas hinzufügen, ändern, sperren oder löschen.</p>';
+  if (ed) {
+    const r = ed.id === 'new' ? { name: '', cat: 'raum', hint: '', img: '', open: 7, close: 22, minH: 1, maxH: 0, dayOnly: false, aheadDays: 125, repeat: false, repeatMonths: 4, active: true } : resOf(ed.id);
+    const durs = []; for (let i = 1; i <= 24; i++) durs.push([i, hoursText(i)]);
+    h += '<form id="resform" class="card" novalidate><h3>' + (ed.id === 'new' ? 'Neu hinzufügen' : esc(r.name) + ' bearbeiten') + '</h3>' +
+      field('rs-name', 'Name', input('rs-name', r.name, 'text', ' maxlength="40"')) +
+      field('rs-cat', 'Typ', selectHtml('rs-cat', Object.keys(CATS).map(k => [k, CATS[k]]), r.cat)) +
+      '<p class="muted">Nur ein Raum kann Ort eines Anlasses sein. Waschmaschinen erscheinen unter «Waschen», alles andere unter «Räume».</p>' +
+      field('rs-hint', 'Hinweis', input('rs-hint', r.hint, 'text', ' maxlength="60"'), 'freiwillig, zum Beispiel der Preis') +
+      picField('rs', r.img) +
+      '<div class="two">' + field('rs-open', 'Frühestens ab', selectHtml('rs-open', hourList(0, 23), r.open)) + field('rs-close', 'Spätestens bis', selectHtml('rs-close', hourList(1, 24), r.close)) + '</div>' +
+      '<div class="two">' + field('rs-min', 'Mindestdauer', selectHtml('rs-min', durs, r.minH)) + field('rs-max', 'Höchstdauer', selectHtml('rs-max', [[0, 'Keine Grenze']].concat(durs), r.maxH)) + '</div>' +
+      check('rs-day', 'Nur für den ganzen Tag (zum Beispiel Gästezimmer)', r.dayOnly) +
+      field('rs-ahead', 'Wie weit im Voraus?', selectHtml('rs-ahead', [[7, '1 Woche'], [14, '2 Wochen'], [30, '1 Monat'], [60, '2 Monate'], [90, '3 Monate'], [125, '4 Monate'], [183, '6 Monate'], [366, '1 Jahr']], r.aheadDays)) +
+      check('rs-rep', 'Darf wiederholt reserviert werden (jede Woche oder alle 2 Wochen)', r.repeat) +
+      field('rs-repm', 'Wiederholen höchstens für', selectHtml('rs-repm', [1, 2, 3, 4, 6, 9, 12].map(m => [m, m === 1 ? '1 Monat' : m + ' Monate']), r.repeatMonths)) +
+      check('rs-active', 'Kann im Moment reserviert werden', r.active) +
+      '<p class="err" id="rs-err" role="alert"></p>' + formButtons('Speichern') + '</form>';
+  } else h += addButton('res', 'Neu hinzufügen');
+  return h + '<ul class="list">' + D.resources.map(r =>
+    '<li>' + (r.img ? '<img class="mini" src="' + esc(r.img) + '" alt="">' : '') + '<div class="grow"><div class="when">' + esc(resLabel(r)) + (r.active ? '' : ' <span class="pill">GESPERRT</span>') + '</div><div class="muted">' + esc(CATS[r.cat]) + ' · ' +
+      (r.dayOnly ? 'nur ganzer Tag' : span(r.open, r.close) + ', ' + (r.maxH ? r.minH + ' bis ' + hoursText(r.maxH) : 'ab ' + hoursText(r.minH))) + (r.repeat ? ' · wiederholbar' : '') + (r.hint ? ' · ' + esc(r.hint) : '') + '</div></div>' +
+    '<span class="row"><button class="btn" data-a="edit" data-v="res:' + r.id + '">Bearbeiten</button>' + delButtons('res', r.id, 'Löschen', 'Ja, mit allen Reservationen löschen') + '</span></li>').join('') + '</ul>';
+}
+
+function adminEvents() {
+  const ed = editing('events'); let h = '<p class="muted">Anlässe erscheinen zuoberst auf der Infotafel. Der Ort wird gleich mitreserviert.</p>';
+  if (ed) {
+    const e = ed.id === 'new' ? { title: '', date: core.addDays(D.today, 7), from: 14, to: 17, all: false, res: (D.resources.find(r => r.cat === 'raum') || {}).id || '', desc: '', img: '' } : D.events.find(x => x.id === ed.id);
+    h += '<form id="evform" class="card" novalidate><h3>' + (ed.id === 'new' ? 'Neuer Anlass' : 'Anlass bearbeiten') + '</h3>' +
+      field('ev-title', 'Titel', input('ev-title', e.title, 'text', ' maxlength="60"')) +
+      field('ev-date', 'Tag', input('ev-date', e.date, 'date', ' min="' + D.today + '"')) +
+      '<div class="two">' + field('ev-from', 'Von', selectHtml('ev-from', hourList(0, 23), e.from)) + field('ev-to', 'Bis', selectHtml('ev-to', hourList(1, 24), e.to)) + '</div>' +
+      check('ev-all', 'Ganzer Tag', e.all) +
+      field('ev-res', 'Ort', selectHtml('ev-res', D.resources.filter(r => core.EVENT_CATS.indexOf(r.cat) >= 0).map(r => [r.id, r.name]).concat([['', 'Anderer Ort (ohne Reservation)']]), e.res || ''), 'nur Räume') +
+      field('ev-desc', 'Beschreibung', '<textarea id="ev-desc" maxlength="400">' + esc(e.desc) + '</textarea>', 'freiwillig') +
+      picField('ev', e.img) +
+      '<p class="err" id="ev-err" role="alert"></p>' + formButtons('Anlass speichern') + '</form>';
+  } else h += addButton('events', 'Neuen Anlass planen');
+  const list = D.events.slice().sort(byTime);
+  return h + (list.length ? '<ul class="list">' + list.map(e => '<li><div class="grow"><div class="when">' + esc(shortDate(e.date)) + ' · ' + esc(timeLabel(e, null)) + '</div><div>' + esc(e.title) + ' · ' + esc((resOf(e.res) || { name: 'Anderer Ort' }).name) + ' · ' + e.going + ' Zusagen</div></div>' +
+    '<span class="row"><button class="btn" data-a="edit" data-v="events:' + e.id + '">Bearbeiten</button>' + delButtons('event', e.id, 'Absagen', 'Ja, Anlass absagen') + '</span></li>').join('') + '</ul>' : '<p class="muted">Im Moment ist kein Anlass geplant.</p>');
+}
+
+function adminPosts() {
+  const ed = editing('posts'); let h = '<p class="muted">Mitteilungen stehen auf der Startseite. Wichtige stehen zuoberst.</p>';
+  if (ed) {
+    const p = ed.id === 'new' ? { title: '', body: '', important: false } : D.posts.find(x => x.id === ed.id);
+    h += '<form id="postform" class="card" novalidate><h3>' + (ed.id === 'new' ? 'Neue Mitteilung' : 'Mitteilung bearbeiten') + '</h3>' +
+      field('po-title', 'Titel', input('po-title', p.title, 'text', ' maxlength="80"')) +
+      field('po-body', 'Text', '<textarea id="po-body" maxlength="800">' + esc(p.body) + '</textarea>') +
+      check('po-imp', 'Als wichtig markieren (steht zuoberst)', p.important) +
+      '<p class="err" id="po-err" role="alert"></p>' + formButtons('Mitteilung speichern') + '</form>';
+  } else h += addButton('posts', 'Neue Mitteilung schreiben');
+  return h + '<ul class="list">' + D.posts.slice().sort((a, b) => b.date.localeCompare(a.date)).map(p =>
+    '<li><div class="grow"><div class="when">' + esc(p.title) + (p.important ? ' <span class="pill">WICHTIG</span>' : '') + '</div><div class="muted">' + esc(shortDate(p.date)) + '</div></div>' +
+    '<span class="row"><button class="btn" data-a="edit" data-v="posts:' + p.id + '">Bearbeiten</button>' + delButtons('post', p.id, 'Löschen', 'Ja, löschen') + '</span></li>').join('') + '</ul>';
+}
+
+function adminUsers() {
+  const ed = editing('users'); let h = '<p class="muted">Ein Konto pro Wohnung. Du gibst ein Startpasswort, das die Wohnung später selber ändern kann. Als Benutzername geht jede E-Mail-Adresse oder ein kurzer Name wie «1.06».</p>';
+  if (ed) {
+    const u = ed.id === 'new' ? { name: '', login: '', role: 'resident' } : D.users.find(x => x.id === ed.id);
+    h += '<form id="userform" class="card" novalidate><h3>' + (ed.id === 'new' ? 'Neues Konto' : esc(u.name) + ' bearbeiten') + '</h3>' +
+      field('us-name', 'Name', input('us-name', u.name, 'text', ' maxlength="40"'), 'so steht es bei Reservationen, zum Beispiel «Wohnung 1.06»') +
+      field('us-login', 'E-Mail oder Benutzername', input('us-login', u.login, 'text', ' maxlength="120" autocapitalize="none" spellcheck="false"')) +
+      field('us-role', 'Rolle', selectHtml('us-role', [['resident', 'Bewohner'], ['admin', 'Admin']], u.role)) +
+      field('us-pw', ed.id === 'new' ? 'Startpasswort' : 'Neues Startpasswort', input('us-pw', '', 'text', ' autocomplete="off" spellcheck="false"'), ed.id === 'new' ? 'mindestens 6 Zeichen' : 'leer lassen, wenn das Passwort bleiben soll') +
+      '<button class="btn quiet" type="button" data-a="pw-suggest">Passwort vorschlagen</button>' +
+      '<p class="err" id="us-err" role="alert"></p>' + formButtons('Konto speichern') + '</form>';
+  } else h += addButton('users', 'Neues Konto anlegen');
+  return h + '<ul class="list">' + D.users.map(u =>
+    '<li><div class="grow"><div class="when">' + esc(u.name) + (u.role === 'admin' ? ' <span class="pill">ADMIN</span>' : '') + '</div><div class="muted">' + esc(u.login) + (u.initial ? ' · benutzt noch das Startpasswort' : '') + '</div></div>' +
+    '<span class="row"><button class="btn" data-a="edit" data-v="users:' + u.id + '">Bearbeiten</button>' + (u.id === D.me.id ? '' : delButtons('user', u.id, 'Löschen', 'Ja, Konto und Reservationen löschen')) + '</span></li>').join('') + '</ul>';
+}
+
+function adminBookings() {
+  const list = D.bookings.slice().sort(byTime);
+  return '<p class="muted">Alle kommenden Reservationen im Haus. Du kannst jede absagen.</p>' + (list.length ? bookingRows(list, true) : '<p class="muted">Es gibt keine Reservationen.</p>');
+}
+
+function adminContact() {
+  const c = D.settings;
+  return '<form id="ctform" class="card" novalidate>' +
+    field('ct-email', 'E-Mail der Admins', input('ct-email', c.email, 'email')) +
+    field('ct-sender', 'Absender von Mitteilungen und Anlässen', input('ct-sender', c.sender, 'text', ' maxlength="40"')) +
+    '<p class="muted">Diese Adresse steht auf der Startseite unter «Fragen oder Hilfe?».</p>' +
+    '<p class="err" id="ct-err" role="alert"></p><button class="btn primary" type="submit">Speichern</button></form>';
+}
+
+function adminView() {
+  const views = { res: adminRes, events: adminEvents, posts: adminPosts, users: adminUsers, bookings: adminBookings, contact: adminContact };
+  return header('', '') + '<div class="adminband">' + ic('verwalten') + '<span><b>Admin-Bereich</b><br>Änderungen hier gelten für alle im Haus.</span></div>' + '<main><div class="tabs">' +
+    TABS.map(t => '<button class="opt" data-a="tab" data-v="' + t[0] + '" aria-pressed="' + (ui.tab === t[0]) + '"><b>' + t[1] + '</b></button>').join('') + '</div>' +
+    '<section class="stack"><h2>' + TABS.find(t => t[0] === ui.tab)[1] + '</h2>' + views[ui.tab]() + '</section></main>';
+}
+
+/* ---------- drawing ---------- */
+function navHtml(cur) {
+  return '<nav class="bar" aria-label="Hauptmenü"><ul>' + navItems().map(n =>
+    '<li><a href="#' + n[0] + '"' + (n[0] === cur ? ' aria-current="page"' : '') + '>' + ic(n[0]) + '<span>' + n[1] + '</span></a></li>').join('') + '</ul></nav>';
+}
+function render() {
+  const app = $('app'); ui.stale = false;
+  if (!booted) { app.className = 'login'; app.innerHTML = '<p class="muted">Einen Moment …</p>'; return; }
+  const keep = ['lg-name', 'lg-pass'].map(id => $(id) ? $(id).value : null);
+  if (!D) { app.className = 'login'; document.body.classList.remove('admin-mode'); app.innerHTML = loginView(); ['lg-name', 'lg-pass'].forEach((id, i) => { if (keep[i] != null) $(id).value = keep[i]; }); return; }
+  const r = route(); app.className = ''; document.body.classList.toggle('admin-mode', r === 'verwalten');
+  app.innerHTML = (r === 'start' ? startView() : r === 'reservieren' || r === 'waschen' ? bookingView(r) : r === 'anlaesse' ? eventsView() : adminView()) + navHtml(r);
+  syncWheels();
+}
+/* New data from the server: show it at once, unless someone is in the middle of typing. */
+const typing = () => ui.edit || ui.form || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+function take(d) { const changed = !D || d.version !== D.version || d.today !== D.today || d.nowHour !== D.nowHour || d.me.id !== D.me.id; D = d; return changed; }
+async function refresh() {
+  try { if (take(await api.state())) { if (typing()) ui.stale = true; else render(); } }
+  catch (e) { if (e.status === 401 && D) { D = null; render(); } }
+}
+async function run(name, p, o) {
+  o = o || {};
+  try {
+    const out = await api.act(name, p); take(out.state);
+    if (o.close) { ui.edit = null; ui.form = null; ui.img = undefined; }
+    render(); toast(typeof o.ok === 'function' ? o.ok(out.result) : o.ok || 'Gespeichert');
+    return true;
+  } catch (e) {
+    if (e.status === 401) { D = null; render(); return false; }
+    if (o.err && $(o.err)) { $(o.err).textContent = e.message; try { take(await api.state()); } catch (x) {} }
+    else { try { take(await api.state()); } catch (x) {} render(); toast(e.message); }
+    return false;
+  }
+}
+
+/* ---------- actions ---------- */
+const DELETE = {
+  booking: id => run('cancel', { id }, { ok: 'Reservation abgesagt' }),
+  series: id => run('cancelSeries', { series: id }, { ok: r => r.removed + ' Termine abgesagt' }),
+  event: id => run('eventDelete', { id }, { ok: 'Anlass abgesagt, Ort wieder frei' }),
+  post: id => run('postDelete', { id }, { ok: 'Mitteilung gelöscht' }),
+  res: id => run('resDelete', { id }, { ok: 'Gelöscht' }),
+  user: id => run('userDelete', { id }, { ok: 'Konto gelöscht' })
+};
+
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-a]'); if (!el) return;
+  const a = el.dataset.a, v = el.dataset.v, rt = D ? route() : '';
+  const res = (rt === 'reservieren' || rt === 'waschen') ? resOf(ui.res[rt]) : null;
+  if (a === 'showpass') { v.split(',').forEach(id => { $(id).type = el.checked ? 'text' : 'password'; }); return; }
+  if (a === 'pw-suggest') { const w = ['Garten', 'Balkon', 'Sonne', 'Linde', 'Apfel', 'Wolke', 'Brunnen', 'Wiese']; $('us-pw').value = w[Math.floor(Math.random() * w.length)] + '-' + (1000 + Math.floor(Math.random() * 9000)); return; }
+  if (a === 'copymail') {
+    const done = () => toast('Adresse kopiert');
+    const fallback = () => { const range = document.createRange(); range.selectNodeContents($('mail')); const s = getSelection(); s.removeAllRanges(); s.addRange(range); toast('Adresse ist markiert'); };
+    try { navigator.clipboard.writeText(D.settings.email).then(done, fallback); } catch (err) { fallback(); }
+    return;
+  }
+  if (a === 'logout') { try { await api.logout(); } catch (err) {} D = null; ui.form = null; ui.edit = null; location.hash = ''; render(); return; }
+  if (a === 'going') { const ev = D.events.find(x => x.id === v); if (ev) await run('going', { event: v, on: !ev.iGo }, { ok: ev.iGo ? 'Abgemeldet' : 'Angemeldet' }); return; }
+  if (a === 'del-yes') { const x = v.split(':'); ui.del = null; await DELETE[x[0]](x[1]); return; }
+  if (a === 'book' && res && ui.sel) {
+    const p = { res: res.id, date: ui.day, from: ui.sel.from, to: ui.sel.to, every: res.repeat ? ui.rep.every : 0, months: ui.rep.months };
+    const day = ui.day; ui.sel = null;
+    await run('book', p, { ok: r => r.made === 1 && !r.skipped ? 'Reserviert für ' + shortDate(day) : r.made + ' Termine reserviert' + (r.skipped ? ', ' + r.skipped + ' waren schon belegt' : '') });
+    ui.rep = { every: 0, months: 4 }; return;
+  }
+  if (a === 'disp') ui.disp = !ui.disp;
+  else if (a === 'size') { P.size = Number(v); saveP(); }
+  else if (a === 'theme') { P.theme = v; saveP(); }
+  else if (a === 'res') { ui.res[rt] = v; try { localStorage.setItem('oele51-last-' + rt, v); } catch (err) {} ui.sel = null; ui.page = 0; }
+  else if (a === 'day') { ui.day = v; ui.sel = null; }
+  else if (a === 'page') { ui.page = Math.max(0, ui.page + Number(v)); ui.day = core.addDays(D.today, ui.page * 14); ui.sel = null; }
+  else if (a === 'allday' && res) { const full = ui.sel && ui.sel.from === res.open && ui.sel.to === res.close; ui.sel = full ? null : { from: res.open, to: res.close }; }
+  else if (a === 'wstep' && ui.sel) { const x = v.split(':'); setWheel(x[0], (x[0] === 'wf' ? ui.sel.from : ui.sel.to) + Number(x[1])); }
+  else if (a === 'wpick') { const x = v.split(':'); setWheel(x[0], Number(x[1])); }
+  else if (a === 'rep') ui.rep.every = Number(v);
+  else if (a === 'repm') ui.rep.months = Number(v);
+  else if (a === 'del-ask') ui.del = v;
+  else if (a === 'del-no') ui.del = null;
+  else if (a === 'form') ui.form = v;
+  else if (a === 'form-close') ui.form = null;
+  else if (a === 'tab') { ui.tab = v; ui.edit = null; ui.img = undefined; }
+  else if (a === 'goto') { ui.tab = v; ui.edit = null; if (rt !== 'verwalten') { location.hash = 'verwalten'; return; } }
+  else if (a === 'edit') { const x = v.split(':'); ui.edit = { kind: x[0], id: x[1] }; ui.img = undefined; }
+  else if (a === 'edit-close') { ui.edit = null; ui.img = undefined; }
+  else if (a === 'img-clear') { ui.img = ''; $(v + '-prev').hidden = true; $(v + '-img').value = ''; el.hidden = true; return; }
+  render();
+  if (a === 'form' || a === 'edit') { const f = document.querySelector('#app form'); if (f) { f.scrollIntoView({ block: 'start' }); const i = f.querySelector('input,textarea'); if (i) i.focus(); } }
+});
+
+let wheelTimer;
+document.addEventListener('scroll', e => {
+  const w = e.target; if (!w.classList || !w.classList.contains('wheel')) return;
+  clearTimeout(wheelTimer);
+  wheelTimer = setTimeout(() => {
+    const vals = w.dataset.vals.split(',').map(Number);
+    if (setWheel(w.id, vals[clamp(Math.round(w.scrollTop / WH), 0, vals.length - 1)])) render();
+  }, 150);
+}, true);
+
+document.addEventListener('change', e => {
+  if (e.target.id !== 'ev-img' && e.target.id !== 'rs-img') return;
+  const pre = e.target.id.split('-')[0], file = e.target.files[0], prev = $(pre + '-prev'); if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, 900 / im.width), c = document.createElement('canvas');
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      ui.img = c.toDataURL('image/jpeg', 0.72); prev.src = ui.img; prev.hidden = false;
+      const clear = document.querySelector('[data-a="img-clear"][data-v="' + pre + '"]'); if (clear) clear.hidden = false;
+    };
+    im.onerror = () => { $(pre + '-err').textContent = 'Dieses Bild lässt sich nicht öffnen. Bitte wähle ein anderes.'; };
+    im.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+});
+
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  const val = id => $(id).value.trim(), num = id => Number($(id).value), on = id => $(id).checked, id = e.target.id;
+  const editId = ui.edit && ui.edit.id !== 'new' ? ui.edit.id : undefined;
+  if (id === 'login') {
+    if (!val('lg-name') || !$('lg-pass').value) { $('lg-err').textContent = 'Bitte gib Benutzername und Passwort ein.'; return; }
+    try { await api.login(val('lg-name'), $('lg-pass').value); D = await api.state(); location.hash = ''; render(); scrollTo(0, 0); if (api.wake) api.wake(); }
+    catch (err) { $('lg-err').textContent = err.message; }
+  }
+  else if (id === 'pwform') await run('password', { old: $('pw-old').value, new: $('pw-new').value }, { ok: 'Neues Passwort gespeichert', err: 'pw-err', close: true });
+  else if (id === 'resform') await run('resSave', { id: editId, name: val('rs-name'), cat: val('rs-cat'), hint: val('rs-hint'), open: num('rs-open'), close: num('rs-close'), minH: num('rs-min'), maxH: num('rs-max'), dayOnly: on('rs-day'), aheadDays: num('rs-ahead'), repeat: on('rs-rep'), repeatMonths: num('rs-repm'), active: on('rs-active'), img: ui.img }, { err: 'rs-err', close: true });
+  else if (id === 'evform') await run('eventSave', { id: editId, title: val('ev-title'), date: val('ev-date'), from: num('ev-from'), to: num('ev-to'), all: on('ev-all'), res: val('ev-res'), desc: val('ev-desc'), img: ui.img }, { ok: 'Anlass gespeichert', err: 'ev-err', close: true });
+  else if (id === 'postform') await run('postSave', { id: editId, title: val('po-title'), body: val('po-body'), important: on('po-imp') }, { ok: 'Mitteilung gespeichert', err: 'po-err', close: true });
+  else if (id === 'userform') await run('userSave', { id: editId, name: val('us-name'), login: val('us-login'), role: val('us-role'), password: val('us-pw') }, { ok: 'Konto gespeichert', err: 'us-err', close: true });
+  else if (id === 'ctform') await run('settings', { email: val('ct-email'), sender: val('ct-sender') }, { err: 'ct-err' });
+});
+
+document.addEventListener('focusout', () => setTimeout(() => { if (ui.stale && !typing()) render(); }, 50));
+addEventListener('hashchange', () => { ui.disp = false; ui.sel = null; ui.form = null; ui.edit = null; ui.del = null; ui.img = undefined; ui.page = 0; ui.day = null; render(); scrollTo(0, 0); });
+
+(async function boot() {
+  render();
+  try { D = await api.state(); } catch (e) { D = null; }
+  booted = true; render();
+  api.listen(() => { if (D) refresh(); });
+})();
+})();
