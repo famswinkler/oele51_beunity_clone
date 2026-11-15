@@ -1,6 +1,6 @@
 # Oele51 Hausverein app: plan
 
-Status 15 Nov 2026: the app works end to end (server, login, reservations, admin area). It is not hosted yet.
+Status 15 Nov 2026 (updated): the app works end to end (server, login, reservations, admin area). It is not hosted yet.
 
 ## Goal
 
@@ -11,7 +11,7 @@ A small, fast app for the residents of Oele51 that replaces the current house ap
 3. Reserve the washing machine on each of the 4 floors
 4. An info board
 
-Chat, marketplace, working groups and damage reports are out of scope. Chat moves to WhatsApp.
+Chat, marketplace, working groups and damage reports are out of scope. WhatsApp is not part of the app.
 
 ## Decided
 
@@ -23,7 +23,12 @@ Chat, marketplace, working groups and damage reports are out of scope. Chat move
 - The app says "Du"
 - Only admins post notices and plan events. Events show first on the info board, with a picture if there is one
 - The info board opens the start page
-- Admin email and WhatsApp link do not exist yet. Admins enter them later in the app
+- Reservable at the start: Gemeinschaftsraum, Gästezimmer, Festbankgarnituren, and the washing machines on the 1st to 4th floor (no ground floor). Each has a photo; admins can change or add pictures
+- Every reservable thing has a type: Raum, Gästezimmer, Material or Waschmaschine. Only a Raum can be the place of an event
+- "Fragen oder Hilfe?" shows the admin email hubi.weber@bluewin.ch. No WhatsApp link
+- Bottom bar order: Start, Anlässe, Waschen, Räume (and Admin for admins)
+- Days that are fully booked are filled dark, partly booked days light
+- The admin area has its own colours (charcoal and peach instead of green) and a band saying changes apply to everyone
 - Each device can set the text size and light or dark colours. Contrast must stay readable in bright light
 
 ## Design rules (for senior residents)
@@ -33,7 +38,7 @@ Chat, marketplace, working groups and damage reports are out of scope. Chat move
 - A bottom bar with icon and word is visible on every screen
 - Reserving takes three steps: what, day, time. Then one confirmation
 - Plain Swiss German words: Reservation, Anlass, Waschmaschine, Infotafel
-- Status is shown in words, not colour alone: "frei", "teils", "voll", "Meine Reservation"
+- Status is shown in words and colour: "frei" (white), "teils" (light), "voll" (dark), "Meine Reservation"
 - Deleting always asks "Ja / Nein" first
 - Colours from the logo: sage green, charcoal, the peach of the balconies. Dark mode included
 - Typeface: Atkinson Hyperlegible, made for readers with low vision
@@ -62,12 +67,12 @@ Six sections, all with add, edit and delete:
 
 | Section | What admins set |
 |---|---|
-| Reservierbares | Name, kind, hint (for example the price), earliest and latest hour, minimum and maximum duration, whole day only, how far ahead, whether it may repeat and for how many months, paused or active |
+| Reservierbares | Name, type, picture, hint (for example the price), earliest and latest hour, minimum and maximum duration, whole day only, how far ahead, whether it may repeat and for how many months, paused or active |
 | Anlässe | Title, day, time or whole day, place (reserved automatically), description, picture |
 | Infotafel | Notices, important ones on top |
 | Wohnungen | Accounts: name, login, role (Bewohner or Admin), initial password |
 | Reservationen | All upcoming reservations in the house, cancel any |
-| Kontakt | Admin email, WhatsApp invite link, sender name for notices |
+| Kontakt | Admin email, sender name for notices |
 
 ## Technology
 
@@ -107,7 +112,6 @@ Not tested: picture upload, wheel feel on a real touch screen, contrast in sunli
 
 - Where should it be hosted, and what yearly budget is acceptable? It needs a place that runs a Node.js program all the time and keeps its data folder. A Swiss host is possible
 - Which address should the app have (for example app.oele51.ch)?
-- Which rooms and tables exist? "Festtisch 1 / 2" are examples. Admins can fix this in the app
 - Is the app in German only?
 
 ## Not checked

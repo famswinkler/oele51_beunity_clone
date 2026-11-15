@@ -6,7 +6,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const CATS = { raum: 'Raum', tisch: 'Tisch', wasch: 'Waschmaschine', anderes: 'Anderes' };
+  /* Types of reservable things. Only rooms can be the place of an event. */
+  const CATS = { raum: 'Raum', zimmer: 'Gästezimmer', material: 'Material', wasch: 'Waschmaschine' };
+  const EVENT_CATS = ['raum'];
   const pad = n => String(n).padStart(2, '0');
   const span = (a, b) => pad(a) + '–' + pad(b) + ' Uhr';
   const hoursText = n => n === 1 ? '1 Stunde' : n + ' Stunden';
@@ -23,17 +25,24 @@
   const int = (v, lo, hi, def) => { v = Number(v); return Number.isInteger(v) ? Math.max(lo, Math.min(hi, v)) : def; };
   const str = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
   const nextId = (s, p) => p + (s.seq++);
+  const imgOk = v => /^data:image\/(jpeg|png|webp);base64,/.test(v) && v.length < 400000;
 
   function seed() {
-    const s = { v: 1, seq: 1, version: 1, settings: { email: '', whatsapp: '', sender: 'Vorstand' }, users: [], sessions: {}, resources: [], bookings: [], events: [], posts: [] };
-    const R = (name, cat, hint, extra) => s.resources.push(Object.assign({ id: nextId(s, 'r'), name, cat, hint, open: 7, close: 22, minH: 1, maxH: 0, dayOnly: false, aheadDays: 125, repeat: false, repeatMonths: 4, active: true }, extra || {}));
-    R('Gemeinschaftsraum', 'raum', 'Privater Anlass CHF 20 pro Tag');
-    R('Terrasse', 'raum', 'Beim Gemeinschaftsraum');
-    R('Gästezimmer', 'raum', 'CHF 20 pro Nacht', { dayOnly: true });
-    R('Festtisch 1', 'tisch', 'Beispiel');
-    R('Festtisch 2', 'tisch', 'Beispiel');
-    ['Erdgeschoss', '1. Stock', '2. Stock', '3. Stock'].forEach(n => R(n, 'wasch', 'Waschmaschine', { repeat: true }));
+    const s = { v: 2, seq: 1, version: 1, settings: { email: 'hubi.weber@bluewin.ch', sender: 'Vorstand' }, users: [], sessions: {}, resources: [], bookings: [], events: [], posts: [] };
+    const R = (name, cat, hint, extra) => s.resources.push(Object.assign({ id: nextId(s, 'r'), name, cat, hint, img: '', open: 7, close: 22, minH: 1, maxH: 0, dayOnly: false, aheadDays: 125, repeat: false, repeatMonths: 4, active: true }, extra || {}));
+    R('Gemeinschaftsraum', 'raum', 'Privater Anlass CHF 20 pro Tag', { img: 'img/gemeinschaftsraum.jpg' });
+    R('Gästezimmer', 'zimmer', 'CHF 20 pro Nacht', { dayOnly: true, img: 'img/gaestezimmer.jpg' });
+    R('Festbankgarnituren', 'material', 'Tische und Bänke, für den ganzen Tag', { dayOnly: true, img: 'img/festbank.jpg' });
+    ['1. Stock', '2. Stock', '3. Stock', '4. Stock'].forEach(n => R(n, 'wasch', 'Waschmaschine', { repeat: true }));
     return s;
+  }
+
+  /* Brings data saved by an older version up to date. */
+  function migrate(s) {
+    const old = { tisch: 'material', anderes: 'material' };
+    s.resources.forEach(r => { if (old[r.cat]) r.cat = old[r.cat]; if (!CATS[r.cat]) r.cat = 'material'; if (r.img == null) r.img = ''; });
+    if (s.settings) delete s.settings.whatsapp;
+    s.v = 2; return s;
   }
 
   const findUser = (s, login) => { const l = str(login, 120).toLowerCase(); return s.users.find(u => u.login === l); };
@@ -48,7 +57,7 @@
       version: s.version, today: t, nowHour: ctx.nowHour,
       me: { id: u.id, name: u.name, login: u.login, role: u.role, initial: !!u.initial },
       settings: s.settings,
-      resources: s.resources.filter(r => admin || r.active),
+      resources: s.resources.filter(r => admin || r.active).map(r => Object.assign({}, r)),
       bookings: s.bookings.filter(b => b.date >= t).map(b => ({ id: b.id, res: b.res, date: b.date, from: b.from, to: b.to, by: nameOf(s, b.user), mine: b.user === u.id, ev: b.ev || null, series: b.series || null, every: b.every || 0 })),
       events: s.events.filter(e => e.date >= t).map(e => ({ id: e.id, title: e.title, date: e.date, from: e.from, to: e.to, all: !!e.all, res: e.res, desc: e.desc, img: e.img || '', by: s.settings.sender, going: e.going.length, iGo: e.going.includes(u.id) })),
       posts: s.posts,
@@ -126,8 +135,11 @@
       const len = close - open, minH = int(p.minH, 1, 24, 1), maxH = int(p.maxH, 0, 24, 0);
       if (minH > len) fail('Die Mindestdauer ist länger als die Öffnungszeit.');
       if (maxH && maxH < minH) fail('Die Höchstdauer muss mindestens so lang sein wie die Mindestdauer.');
-      const data = { name, cat: CATS[p.cat] ? p.cat : 'anderes', hint: str(p.hint, 60), open, close, minH, maxH: maxH >= len ? 0 : maxH, dayOnly: !!p.dayOnly, aheadDays: int(p.aheadDays, 1, 366, 125), repeat: !!p.repeat, repeatMonths: int(p.repeatMonths, 1, 12, 4), active: p.active !== false };
-      if (p.id) Object.assign(resOf(s, p.id) || fail('Das gibt es nicht mehr.', 404), data);
+      const data = { name, cat: CATS[p.cat] ? p.cat : 'material', hint: str(p.hint, 60), open, close, minH, maxH: maxH >= len ? 0 : maxH, dayOnly: !!p.dayOnly, aheadDays: int(p.aheadDays, 1, 366, 125), repeat: !!p.repeat, repeatMonths: int(p.repeatMonths, 1, 12, 4), active: p.active !== false };
+      const old = p.id ? (resOf(s, p.id) || fail('Das gibt es nicht mehr.', 404)) : null;
+      data.img = old ? old.img : '';
+      if (typeof p.img === 'string') data.img = imgOk(p.img) ? p.img : '';
+      if (old) Object.assign(old, data);
       else s.resources.push(Object.assign({ id: nextId(s, 'r') }, data));
       return {};
     },
@@ -140,13 +152,14 @@
       const title = str(p.title, 60) || fail('Bitte gib einen Titel ein.');
       if (!isDate(p.date) || (!old && p.date < ctx.today)) fail('Bitte wähle einen Tag ab heute.');
       const r = p.res ? (resOf(s, p.res) || fail('Diesen Ort gibt es nicht mehr.', 404)) : null;
+      if (r && EVENT_CATS.indexOf(r.cat) < 0) fail(r.name + ' kann nicht mit einem Anlass verknüpft werden. Wähle einen Raum oder «Anderer Ort».');
       const all = !!p.all || !!(r && r.dayOnly);
       const from = all ? (r ? r.open : 7) : Number(p.from), to = all ? (r ? r.close : 22) : Number(p.to);
       if (!Number.isInteger(from) || !Number.isInteger(to) || to <= from || from < 0 || to > 24) fail('«Bis» muss später sein als «Von».');
       const own = old && s.bookings.find(b => b.ev === old.id);
       if (r) { const c = checkSlot(s, ctx, r, p.date, from, to, { event: true, except: own && own.id }); if (c) fail(c.msg, c.status); }
       let img = old ? old.img : '';
-      if (typeof p.img === 'string') img = /^data:image\/(jpeg|png|webp);base64,/.test(p.img) && p.img.length < 400000 ? p.img : '';
+      if (typeof p.img === 'string') img = imgOk(p.img) ? p.img : '';
       const e = old || { id: nextId(s, 'e'), going: [], user: ctx.user.id };
       Object.assign(e, { title, date: p.date, from, to, all, res: r ? r.id : null, desc: str(p.desc, 400), img });
       if (!old) s.events.push(e);
@@ -190,10 +203,9 @@
       return {};
     },
     settings(s, ctx, p) {
-      const email = str(p.email, 120), whatsapp = str(p.whatsapp, 200), sender = str(p.sender, 40) || 'Vorstand';
+      const email = str(p.email, 120), sender = str(p.sender, 40) || 'Vorstand';
       if (email && !/^\S+@\S+\.\S+$/.test(email)) fail('Diese E-Mail-Adresse sieht nicht richtig aus.');
-      if (whatsapp && !/^https:\/\//.test(whatsapp)) fail('Der Link muss mit https:// beginnen.');
-      s.settings = { email, whatsapp, sender }; return {};
+      s.settings = { email, sender }; return {};
     }
   };
   const FOR_ALL = { book: 1, cancel: 1, cancelSeries: 1, going: 1, password: 1 };
@@ -207,5 +219,5 @@
     return out;
   }
 
-  return { CATS, seed, view, act, findUser, addDays, addMonths, span, hoursText, pad };
+  return { CATS, EVENT_CATS, seed, migrate, view, act, findUser, addDays, addMonths, span, hoursText, pad };
 });

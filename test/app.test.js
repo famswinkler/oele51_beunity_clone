@@ -105,6 +105,23 @@ test('an event reserves its room, clashes are refused, cancelling frees the room
   assert.equal((await act(flats[2], 'book', { res: room, date: day(9), from: 12, to: 14 })).status, 200);
 });
 
+test('only rooms can be the place of an event; contact has the admin email and no WhatsApp', async () => {
+  const s = await state(admin);
+  const guest = s.resources.find(r => r.name === 'Gästezimmer'), bench = s.resources.find(r => r.name === 'Festbankgarnituren');
+  assert.deepEqual(s.resources.filter(r => r.cat === 'wasch').map(r => r.name), ['1. Stock', '2. Stock', '3. Stock', '4. Stock']);
+  assert.equal(guest.cat, 'zimmer'); assert.equal(bench.cat, 'material');
+  for (const r of [guest, bench]) assert.equal((await act(admin, 'eventSave', { title: 'Fest', date: day(20), from: 10, to: 12, res: r.id })).status, 400);
+  assert.equal(s.settings.email, 'hubi.weber@bluewin.ch'); assert.equal(s.settings.whatsapp, undefined);
+  assert.ok(s.resources.find(r => r.name === 'Gemeinschaftsraum').img);
+});
+
+test('data saved by the older version is brought up to date', () => {
+  const old = { settings: { email: '', whatsapp: 'https://x', sender: 'V' }, resources: [{ id: 'r1', cat: 'tisch' }, { id: 'r2', cat: 'anderes' }, { id: 'r3', cat: 'raum' }] };
+  core.migrate(old);
+  assert.deepEqual(old.resources.map(r => r.cat), ['material', 'material', 'raum']);
+  assert.equal(old.settings.whatsapp, undefined);
+});
+
 test('a flat changes its password; the admin can give a new initial one', async () => {
   assert.equal((await act(flats[6], 'password', { old: 'wrong', new: 'Mein-Neues' })).status, 400);
   assert.equal((await act(flats[6], 'password', { old: 'Garten-1007', new: 'Mein-Neues' })).status, 200);

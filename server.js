@@ -38,7 +38,7 @@ function start(opts) {
 
   /* ---------- data: one file, written safely after every change, daily backups ---------- */
   let state;
-  if (fs.existsSync(FILE)) state = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+  if (fs.existsSync(FILE)) state = core.migrate(JSON.parse(fs.readFileSync(FILE, 'utf8')));
   else {
     state = core.seed();
     const pw = opts.adminPassword || easyPassword();
@@ -92,6 +92,7 @@ function start(opts) {
   function viewFor(user) {
     const v = core.view(state, ctxOf(user));
     v.events.forEach(e => { e.img = e.img ? 'api/img/' + e.id + '?v=' + state.version : ''; });
+    v.resources.forEach(r => { if (/^data:/.test(r.img)) r.img = 'api/resimg/' + r.id + '?v=' + state.version; });   // uploaded pictures are fetched separately
     return v;
   }
 
@@ -130,8 +131,9 @@ function start(opts) {
       res.write('data: ' + state.version + '\n\n'); listeners.add(res);
       req.on('close', () => listeners.delete(res)); return;
     }
-    if (url.pathname.startsWith('/api/img/') && req.method === 'GET') {
-      const e = state.events.find(x => x.id === url.pathname.slice(9)), m = e && /^data:(image\/\w+);base64,(.*)$/.exec(e.img || '');
+    if ((url.pathname.startsWith('/api/img/') || url.pathname.startsWith('/api/resimg/')) && req.method === 'GET') {
+      const id = url.pathname.split('/').pop(), list = url.pathname.startsWith('/api/img/') ? state.events : state.resources;
+      const e = list.find(x => x.id === id), m = e && /^data:(image\/\w+);base64,(.*)$/.exec(e.img || '');
       if (!m) return send(res, 404, { error: 'Kein Bild.' });
       res.writeHead(200, { 'Content-Type': m[1], 'Cache-Control': 'private, max-age=31536000, immutable' }); return res.end(Buffer.from(m[2], 'base64'));
     }

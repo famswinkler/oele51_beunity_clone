@@ -37,18 +37,20 @@ const httpApi = {
 
 /* ---------- demo: the same rules, running in this browser only ---------- */
 function demoApi() {
-  const KEY = 'oele51-demo-v4', hash = p => 'demo:' + p, verify = (p, h) => h === 'demo:' + p;
+  const KEY = 'oele51-demo-v5', hash = p => 'demo:' + p, verify = (p, h) => h === 'demo:' + p;
   let s = null;
   function make() {
     const t = localIso(), d = n => core.addDays(t, n), x = core.seed();
-    const U = (login, name, role) => x.users.push({ id: 'u' + (x.seq++), login, name, role: role || 'resident', pw: hash('oele51'), initial: role !== 'admin' && login === '1.06' });
-    U('admin', 'Vorstand', 'admin'); U('1.06', 'Wohnung 1.06'); U('1.02', 'Wohnung 1.02'); U('2.03', 'Wohnung 2.03');
+    const U = (login, name, role) => { const id = 'u' + (x.seq++); x.users.push({ id, login, name, role: role || 'resident', pw: hash('oele51'), initial: login === '1.06' }); return id; };
+    const ad = U('admin', 'Vorstand', 'admin'), a = U('1.06', 'Wohnung 1.06'), b = U('1.02', 'Wohnung 1.02'), c = U('2.03', 'Wohnung 2.03'), e = U('3.04', 'Wohnung 3.04');
     const R = n => x.resources.find(r => r.name === n).id, B = (res, day, from, to, user, more) => x.bookings.push(Object.assign({ id: 'b' + (x.seq++), res: R(res), date: d(day), from, to, user }, more || {}));
-    x.events.push({ id: 'e1', title: 'Spielnachmittag', date: d(3), from: 14, to: 17, all: false, res: R('Gemeinschaftsraum'), desc: 'Jassen, Brettspiele, Kaffee und Kuchen. Alle sind willkommen.', img: '', user: 'u10', going: ['u12', 'u13'] });
-    x.events.push({ id: 'e2', title: 'Apéro auf der Terrasse', date: d(9), from: 17, to: 20, all: false, res: R('Terrasse'), desc: 'Jede Wohnung bringt etwas Kleines mit.', img: '', user: 'u10', going: ['u12'] });
-    B('Gemeinschaftsraum', 3, 14, 17, 'u10', { ev: 'e1' }); B('Terrasse', 9, 17, 20, 'u10', { ev: 'e2' });
-    B('1. Stock', 1, 9, 12, 'u12'); B('1. Stock', 1, 15, 16, 'u13'); B('Gästezimmer', 5, 7, 22, 'u13'); B('Gemeinschaftsraum', 1, 18, 22, 'u12');
-    x.posts.push({ id: 'p1', title: 'Willkommen in der neuen Oele51-App', body: 'Hier kannst du Räume, Tische und die Waschmaschine reservieren und siehst, was im Haus läuft.', important: true, by: 'Vorstand', date: d(0) });
+    x.events.push({ id: 'e1', title: 'Spielnachmittag', date: d(3), from: 14, to: 17, all: false, res: R('Gemeinschaftsraum'), desc: 'Jassen, Brettspiele, Kaffee und Kuchen. Alle sind willkommen.', img: '', user: ad, going: [b, c] });
+    x.events.push({ id: 'e2', title: 'Apéro im Gemeinschaftsraum', date: d(9), from: 17, to: 20, all: false, res: R('Gemeinschaftsraum'), desc: 'Jede Wohnung bringt etwas Kleines mit.', img: '', user: ad, going: [b] });
+    B('Gemeinschaftsraum', 3, 14, 17, ad, { ev: 'e1' }); B('Gemeinschaftsraum', 9, 17, 20, ad, { ev: 'e2' }); B('Gemeinschaftsraum', 1, 18, 22, b);
+    B('1. Stock', 1, 9, 12, b); B('1. Stock', 1, 15, 16, c);
+    [[7, 10, b], [10, 13, c], [13, 16, e], [16, 19, b], [19, 22, c]].forEach(x2 => B('1. Stock', 2, x2[0], x2[1], x2[2]));   // a fully booked day
+    B('Gästezimmer', 5, 7, 22, c); B('Festbankgarnituren', 6, 7, 22, e);
+    x.posts.push({ id: 'p1', title: 'Willkommen in der neuen Oele51-App', body: 'Hier kannst du Räume, Material und die Waschmaschine reservieren und siehst, was im Haus läuft.', important: true, by: 'Vorstand', date: d(0) });
     x.posts.push({ id: 'p2', title: 'Ruhezeiten', body: 'Von 22 bis 7 Uhr bitte nicht waschen oder tumblern (Hausordnung).', important: false, by: 'Vorstand', date: d(-2) });
     x.demoUser = null; return x;
   }
@@ -92,14 +94,13 @@ const ICONS = {
   board: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>', up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6.5L20.5 7"/>',
-  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
   pin: '<path d="M12 21s6-5.6 6-10.5a6 6 0 1 0-12 0C6 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.5 3.6-5 7-5s6.2 1.5 7 5"/>'
 };
 const ic = n => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>';
 const admin = () => D && D.me.role === 'admin';
-const navItems = () => [['start', 'Start'], ['reservieren', 'Räume'], ['waschen', 'Waschen'], ['anlaesse', 'Anlässe']].concat(admin() ? [['verwalten', 'Admin']] : []);
+const navItems = () => [['start', 'Start'], ['anlaesse', 'Anlässe'], ['waschen', 'Waschen'], ['reservieren', 'Räume']].concat(admin() ? [['verwalten', 'Admin']] : []);
 const route = () => { const h = location.hash.slice(1); return navItems().some(n => n[0] === h) ? h : 'start'; };
 const resOf = id => D.resources.find(r => r.id === id);
 const resLabel = r => r ? (r.cat === 'wasch' ? 'Waschmaschine ' + r.name : r.name) : 'Gelöscht';
@@ -201,9 +202,6 @@ function contactHtml() {
     ? '<div class="stack"><span>E-Mail an die Admins:</span><span class="mail" id="mail">' + esc(c.email) + '</span>' +
       '<div class="row"><a class="btn primary" href="mailto:' + esc(c.email) + '?subject=Oele51%20App">' + ic('mail') + 'E-Mail schreiben</a><button class="btn" data-a="copymail">Adresse kopieren</button></div></div>'
     : '<div class="row"><button class="btn" disabled>' + ic('mail') + 'E-Mail an die Admins</button><span class="muted">Die Adresse folgt noch.</span></div>';
-  h += c.whatsapp
-    ? '<div class="row"><a class="btn primary" href="' + esc(c.whatsapp) + '" target="_blank" rel="noopener">' + ic('chat') + 'WhatsApp-Gruppe öffnen</a></div>'
-    : '<div class="row"><button class="btn" disabled>' + ic('chat') + 'WhatsApp-Gruppe</button><span class="muted">Der Link folgt noch.</span></div>';
   return h + '</section>';
 }
 
@@ -220,9 +218,9 @@ function accountHtml() {
 
 function startView() {
   const tiles = [
-    ['reservieren', 'Raum oder Tisch reservieren', 'Gemeinschaftsraum, Gästezimmer, Tische'],
+    ['anlaesse', 'Anlässe ansehen', 'Was im Haus geplant ist'],
     ['waschen', 'Waschmaschine reservieren', 'Einmal oder jede Woche'],
-    ['anlaesse', 'Anlässe ansehen', 'Was im Haus geplant ist']
+    ['reservieren', 'Raum oder Material reservieren', D.resources.filter(r => r.active && r.cat !== 'wasch').map(r => r.name).join(', ')]
   ];
   const mine = D.bookings.filter(b => b.mine).sort(byTime);
   return header('Willkommen im Oele51', D.me.name + ' · ' + longDate(D.today)) +
@@ -242,8 +240,12 @@ function startView() {
 const WH = 56;
 const loOf = r => ui.day === D.today ? Math.max(r.open, D.nowHour + 1) : r.open;
 function dayState(r, d) {
-  let n = 0; D.bookings.forEach(b => { if (b.res === r.id && b.date === d) n += Math.max(0, Math.min(b.to, r.close) - Math.max(b.from, r.open)); });
-  return n <= 0 ? 'frei' : n >= r.close - r.open ? 'voll' : 'teils';
+  const bs = D.bookings.filter(b => b.res === r.id && b.date === d);
+  if (r.dayOnly) return bs.length ? 'voll' : 'frei';
+  const lo = d === D.today ? Math.max(r.open, D.nowHour + 1) : r.open;
+  let run = 0, best = 0;
+  for (let h = lo; h < r.close; h++) { run = bs.some(b => b.from <= h && h < b.to) ? 0 : run + 1; best = Math.max(best, run); }
+  return best < r.minH ? 'voll' : bs.length ? 'teils' : 'frei';
 }
 function wheelHtml(id, label, vals, cur) {
   return '<div class="wheelbox"><b id="' + id + '-l">' + label + '</b>' +
@@ -278,7 +280,7 @@ function repeatHtml(r) {
 function bookingView(kind) {
   const wash = kind === 'waschen';
   const group = D.resources.filter(r => r.active && (r.cat === 'wasch') === wash);
-  let h = header(wash ? 'Waschmaschine reservieren' : 'Raum oder Tisch reservieren', 'Drei Schritte: auswählen, Tag antippen, Zeit einstellen.');
+  let h = header(wash ? 'Waschmaschine reservieren' : 'Raum oder Material reservieren', 'Drei Schritte: auswählen, Tag antippen, Zeit einstellen.');
   if (!group.length) return h + '<main><p class="muted">Hier ist noch nichts eingerichtet.' + (admin() ? ' Im Admin-Bereich kannst du etwas hinzufügen.' : '') + '</p></main>';
   let resId = ui.res[kind]; if (!resId) { try { resId = localStorage.getItem('oele51-last-' + kind); } catch (e) {} }
   if (!group.some(r => r.id === resId)) resId = group[0].id;
@@ -290,17 +292,17 @@ function bookingView(kind) {
   if (!days.includes(ui.day)) { ui.day = days[0]; ui.sel = null; }
 
   h += '<main>';
-  h += '<section class="step"><h2><span class="num">1</span>' + (wash ? 'Welcher Stock?' : 'Was möchtest du reservieren?') + '</h2><div class="choices">' +
-    group.map(x => '<button class="opt" data-a="res" data-v="' + x.id + '" aria-pressed="' + (x.id === resId) + '"><b>' + esc(x.name) + '</b><small>' + esc(x.hint || CATS[x.cat]) + '</small></button>').join('') + '</div></section>';
+  h += '<section class="step"><h2><span class="num">1</span>' + (wash ? 'Welcher Stock?' : 'Was möchtest du reservieren?') + '</h2><div class="choices' + (group.some(x => x.img) ? ' pics' : '') + '">' +
+    group.map(x => '<button class="opt res-opt" data-a="res" data-v="' + x.id + '" aria-pressed="' + (x.id === resId) + '">' + (x.img ? '<img class="thumb" src="' + esc(x.img) + '" alt="">' : '') + '<b>' + esc(x.name) + '</b><small>' + esc(x.hint || CATS[x.cat]) + '</small></button>').join('') + '</div></section>';
 
   h += '<section class="step"><h2><span class="num">2</span>An welchem Tag?</h2><div class="days">' +
     days.map(d => { const st = dayState(r, d); return '<button class="opt day-' + st + '" data-a="day" data-v="' + d + '" aria-pressed="' + (d === ui.day) + '"><small>' + (d === D.today ? 'Heute' : esc(fmt(d, { weekday: 'short' }))) + '</small><b>' + esc(fmt(d, { day: 'numeric', month: 'numeric' })) + '</b><small class="st">' + st + '</small></button>'; }).join('') + '</div>' +
-    '<p class="muted">«frei»: noch alles offen. «teils»: ein Teil ist reserviert. «voll»: nichts mehr frei.</p>' +
+    '<p class="legend"><span><i class="sw frei"></i>frei: noch alles offen</span><span><i class="sw teils"></i>teils: ein Teil ist reserviert</span><span><i class="sw voll"></i>voll: nichts mehr frei</span></p>' +
     '<div class="row">' + (ui.page > 0 ? '<button class="btn quiet grow" data-a="page" data-v="-1">Frühere Tage</button>' : '') +
     (core.addDays(D.today, (ui.page + 1) * 14) <= last ? '<button class="btn quiet grow" data-a="page" data-v="1">Spätere Tage</button>' : '') + '</div></section>';
 
   const lo = loOf(r), taken = D.bookings.filter(b => b.res === resId && b.date === ui.day).sort(byTime);
-  const dayFree = !taken.length, fits = r.dayOnly ? true : lo + r.minH <= r.close;
+  const dayFree = !taken.length, dayFull = dayState(r, ui.day) === 'voll', fits = r.dayOnly ? true : !dayFull;
   if (!r.dayOnly && fits && (!ui.sel || ui.sel.from < lo || ui.sel.to > r.close || ui.sel.to - ui.sel.from < r.minH)) {
     let f = lo; while (f + r.minH < r.close && !isFree(resId, ui.day, f, f + r.minH)) f++;
     ui.sel = { from: f, to: f + r.minH };
@@ -313,10 +315,10 @@ function bookingView(kind) {
     ? '<ul class="list">' + taken.map(b => { const ev = b.ev && D.events.find(e => e.id === b.ev); return '<li><span class="when">' + esc(timeLabel(b, r)) + '</span><span>' + esc(b.mine && !ev ? 'Meine Reservation' : ev ? 'Anlass «' + ev.title + '»' : b.by) + '</span></li>'; }).join('') + '</ul>'
     : '<p class="muted">Noch nichts. Der ganze Tag ist frei.</p>') + '</div>';
   if (r.dayOnly) {
-    h += '<p class="muted">' + esc(resLabel(r)) + ' gibt es nur für den ganzen Tag.</p>' +
+    h += (dayFree ? '<p class="muted">' + esc(resLabel(r)) + ' gibt es nur für den ganzen Tag.</p>' : '<p class="full-note">An diesem Tag ist ' + esc(r.name) + ' schon reserviert. Wähle einen anderen Tag.</p>') +
       (dayFree ? '<button class="slot' + (full ? ' picked' : '') + '" data-a="allday" aria-pressed="' + !!full + '"><span class="t">Ganzer Tag</span><span class="s">' + (full ? ic('check') + 'Ausgewählt' : 'Frei') + '</span></button>' : '');
   } else if (!fits) {
-    h += '<p class="muted">Heute geht nichts mehr. Wähle einen anderen Tag.</p>';
+    h += '<p class="full-note">An diesem Tag ist nichts mehr frei. Wähle einen anderen Tag.</p>';
   } else {
     const fv = [], tv = []; for (let i = lo; i <= r.close - r.minH; i++) fv.push(i); for (let i = lo + r.minH; i <= r.close; i++) tv.push(i);
     const clash = taken.filter(b => b.from < sel.to && sel.from < b.to);
@@ -347,17 +349,25 @@ function eventsView() {
 const TABS = [['res', 'Reservierbares'], ['events', 'Anlässe'], ['posts', 'Infotafel'], ['users', 'Wohnungen'], ['bookings', 'Reservationen'], ['contact', 'Kontakt']];
 const formButtons = label => '<div class="row"><button class="btn primary grow" type="submit">' + label + '</button><button class="btn quiet" type="button" data-a="edit-close">Abbrechen</button></div>';
 const editing = kind => ui.edit && ui.edit.kind === kind ? ui.edit : null;
+function picField(pre, cur) {
+  const src = ui.img === undefined ? cur : ui.img;
+  return field(pre + '-img', 'Bild', '<input type="file" id="' + pre + '-img" accept="image/*">', 'freiwillig') +
+    '<img id="' + pre + '-prev" class="prev" alt=""' + (src ? ' src="' + esc(src) + '"' : ' hidden') + '>' +
+    '<button class="btn quiet" type="button" data-a="img-clear" data-v="' + pre + '"' + (src ? '' : ' hidden') + '>Bild entfernen</button>';
+}
 const addButton = (kind, label) => '<button class="btn primary wide" data-a="edit" data-v="' + kind + ':new">' + label + '</button>';
 
 function adminRes() {
   const ed = editing('res'); let h = '<p class="muted">Alles, was reserviert werden kann. Du kannst jederzeit etwas hinzufügen, ändern, sperren oder löschen.</p>';
   if (ed) {
-    const r = ed.id === 'new' ? { name: '', cat: 'raum', hint: '', open: 7, close: 22, minH: 1, maxH: 0, dayOnly: false, aheadDays: 125, repeat: false, repeatMonths: 4, active: true } : resOf(ed.id);
+    const r = ed.id === 'new' ? { name: '', cat: 'raum', hint: '', img: '', open: 7, close: 22, minH: 1, maxH: 0, dayOnly: false, aheadDays: 125, repeat: false, repeatMonths: 4, active: true } : resOf(ed.id);
     const durs = []; for (let i = 1; i <= 24; i++) durs.push([i, hoursText(i)]);
     h += '<form id="resform" class="card" novalidate><h3>' + (ed.id === 'new' ? 'Neu hinzufügen' : esc(r.name) + ' bearbeiten') + '</h3>' +
       field('rs-name', 'Name', input('rs-name', r.name, 'text', ' maxlength="40"')) +
-      field('rs-cat', 'Art', selectHtml('rs-cat', Object.keys(CATS).map(k => [k, CATS[k]]), r.cat), '«Waschmaschine» erscheint unter «Waschen»') +
+      field('rs-cat', 'Typ', selectHtml('rs-cat', Object.keys(CATS).map(k => [k, CATS[k]]), r.cat)) +
+      '<p class="muted">Nur ein Raum kann Ort eines Anlasses sein. Waschmaschinen erscheinen unter «Waschen», alles andere unter «Räume».</p>' +
       field('rs-hint', 'Hinweis', input('rs-hint', r.hint, 'text', ' maxlength="60"'), 'freiwillig, zum Beispiel der Preis') +
+      picField('rs', r.img) +
       '<div class="two">' + field('rs-open', 'Frühestens ab', selectHtml('rs-open', hourList(0, 23), r.open)) + field('rs-close', 'Spätestens bis', selectHtml('rs-close', hourList(1, 24), r.close)) + '</div>' +
       '<div class="two">' + field('rs-min', 'Mindestdauer', selectHtml('rs-min', durs, r.minH)) + field('rs-max', 'Höchstdauer', selectHtml('rs-max', [[0, 'Keine Grenze']].concat(durs), r.maxH)) + '</div>' +
       check('rs-day', 'Nur für den ganzen Tag (zum Beispiel Gästezimmer)', r.dayOnly) +
@@ -368,7 +378,7 @@ function adminRes() {
       '<p class="err" id="rs-err" role="alert"></p>' + formButtons('Speichern') + '</form>';
   } else h += addButton('res', 'Neu hinzufügen');
   return h + '<ul class="list">' + D.resources.map(r =>
-    '<li><div class="grow"><div class="when">' + esc(resLabel(r)) + (r.active ? '' : ' <span class="pill">GESPERRT</span>') + '</div><div class="muted">' + esc(CATS[r.cat]) + ' · ' +
+    '<li>' + (r.img ? '<img class="mini" src="' + esc(r.img) + '" alt="">' : '') + '<div class="grow"><div class="when">' + esc(resLabel(r)) + (r.active ? '' : ' <span class="pill">GESPERRT</span>') + '</div><div class="muted">' + esc(CATS[r.cat]) + ' · ' +
       (r.dayOnly ? 'nur ganzer Tag' : span(r.open, r.close) + ', ' + (r.maxH ? r.minH + ' bis ' + hoursText(r.maxH) : 'ab ' + hoursText(r.minH))) + (r.repeat ? ' · wiederholbar' : '') + (r.hint ? ' · ' + esc(r.hint) : '') + '</div></div>' +
     '<span class="row"><button class="btn" data-a="edit" data-v="res:' + r.id + '">Bearbeiten</button>' + delButtons('res', r.id, 'Löschen', 'Ja, mit allen Reservationen löschen') + '</span></li>').join('') + '</ul>';
 }
@@ -377,17 +387,14 @@ function adminEvents() {
   const ed = editing('events'); let h = '<p class="muted">Anlässe erscheinen zuoberst auf der Infotafel. Der Ort wird gleich mitreserviert.</p>';
   if (ed) {
     const e = ed.id === 'new' ? { title: '', date: core.addDays(D.today, 7), from: 14, to: 17, all: false, res: (D.resources.find(r => r.cat === 'raum') || {}).id || '', desc: '', img: '' } : D.events.find(x => x.id === ed.id);
-    const hasPic = ui.img === undefined ? !!e.img : !!ui.img;
     h += '<form id="evform" class="card" novalidate><h3>' + (ed.id === 'new' ? 'Neuer Anlass' : 'Anlass bearbeiten') + '</h3>' +
       field('ev-title', 'Titel', input('ev-title', e.title, 'text', ' maxlength="60"')) +
       field('ev-date', 'Tag', input('ev-date', e.date, 'date', ' min="' + D.today + '"')) +
       '<div class="two">' + field('ev-from', 'Von', selectHtml('ev-from', hourList(0, 23), e.from)) + field('ev-to', 'Bis', selectHtml('ev-to', hourList(1, 24), e.to)) + '</div>' +
       check('ev-all', 'Ganzer Tag', e.all) +
-      field('ev-res', 'Ort', selectHtml('ev-res', D.resources.filter(r => r.cat !== 'wasch').map(r => [r.id, r.name]).concat([['', 'Anderer Ort (ohne Reservation)']]), e.res || '')) +
+      field('ev-res', 'Ort', selectHtml('ev-res', D.resources.filter(r => core.EVENT_CATS.indexOf(r.cat) >= 0).map(r => [r.id, r.name]).concat([['', 'Anderer Ort (ohne Reservation)']]), e.res || ''), 'nur Räume') +
       field('ev-desc', 'Beschreibung', '<textarea id="ev-desc" maxlength="400">' + esc(e.desc) + '</textarea>', 'freiwillig') +
-      field('ev-img', 'Bild', '<input type="file" id="ev-img" accept="image/*">', 'freiwillig') +
-      '<img id="ev-prev" alt=""' + (hasPic ? ' src="' + esc(ui.img === undefined ? e.img : ui.img) + '"' : ' hidden') + '>' +
-      (hasPic ? '<button class="btn quiet" type="button" data-a="img-clear">Bild entfernen</button>' : '') +
+      picField('ev', e.img) +
       '<p class="err" id="ev-err" role="alert"></p>' + formButtons('Anlass speichern') + '</form>';
   } else h += addButton('events', 'Neuen Anlass planen');
   const list = D.events.slice().sort(byTime);
@@ -436,15 +443,14 @@ function adminContact() {
   const c = D.settings;
   return '<form id="ctform" class="card" novalidate>' +
     field('ct-email', 'E-Mail der Admins', input('ct-email', c.email, 'email')) +
-    field('ct-wa', 'Einladungslink der WhatsApp-Gruppe', input('ct-wa', c.whatsapp, 'url', ' placeholder="https://chat.whatsapp.com/..."')) +
     field('ct-sender', 'Absender von Mitteilungen und Anlässen', input('ct-sender', c.sender, 'text', ' maxlength="40"')) +
-    '<p class="muted">E-Mail und WhatsApp leer lassen, solange es sie noch nicht gibt. Auf der Startseite steht dann «folgt noch».</p>' +
+    '<p class="muted">Diese Adresse steht auf der Startseite unter «Fragen oder Hilfe?».</p>' +
     '<p class="err" id="ct-err" role="alert"></p><button class="btn primary" type="submit">Speichern</button></form>';
 }
 
 function adminView() {
   const views = { res: adminRes, events: adminEvents, posts: adminPosts, users: adminUsers, bookings: adminBookings, contact: adminContact };
-  return header('Admin-Bereich', 'Nur für Admins.') + '<main><div class="tabs">' +
+  return header('', '') + '<div class="adminband">' + ic('verwalten') + '<span><b>Admin-Bereich</b><br>Änderungen hier gelten für alle im Haus.</span></div>' + '<main><div class="tabs">' +
     TABS.map(t => '<button class="opt" data-a="tab" data-v="' + t[0] + '" aria-pressed="' + (ui.tab === t[0]) + '"><b>' + t[1] + '</b></button>').join('') + '</div>' +
     '<section class="stack"><h2>' + TABS.find(t => t[0] === ui.tab)[1] + '</h2>' + views[ui.tab]() + '</section></main>';
 }
@@ -458,8 +464,8 @@ function render() {
   const app = $('app'); ui.stale = false;
   if (!booted) { app.className = 'login'; app.innerHTML = '<p class="muted">Einen Moment …</p>'; return; }
   const keep = ['lg-name', 'lg-pass'].map(id => $(id) ? $(id).value : null);
-  if (!D) { app.className = 'login'; app.innerHTML = loginView(); ['lg-name', 'lg-pass'].forEach((id, i) => { if (keep[i] != null) $(id).value = keep[i]; }); return; }
-  const r = route(); app.className = '';
+  if (!D) { app.className = 'login'; document.body.classList.remove('admin-mode'); app.innerHTML = loginView(); ['lg-name', 'lg-pass'].forEach((id, i) => { if (keep[i] != null) $(id).value = keep[i]; }); return; }
+  const r = route(); app.className = ''; document.body.classList.toggle('admin-mode', r === 'verwalten');
   app.innerHTML = (r === 'start' ? startView() : r === 'reservieren' || r === 'waschen' ? bookingView(r) : r === 'anlaesse' ? eventsView() : adminView()) + navHtml(r);
   syncWheels();
 }
@@ -535,7 +541,7 @@ document.addEventListener('click', async e => {
   else if (a === 'goto') { ui.tab = v; ui.edit = null; if (rt !== 'verwalten') { location.hash = 'verwalten'; return; } }
   else if (a === 'edit') { const x = v.split(':'); ui.edit = { kind: x[0], id: x[1] }; ui.img = undefined; }
   else if (a === 'edit-close') { ui.edit = null; ui.img = undefined; }
-  else if (a === 'img-clear') { ui.img = ''; $('ev-prev').hidden = true; $('ev-img').value = ''; el.hidden = true; return; }
+  else if (a === 'img-clear') { ui.img = ''; $(v + '-prev').hidden = true; $(v + '-img').value = ''; el.hidden = true; return; }
   render();
   if (a === 'form' || a === 'edit') { const f = document.querySelector('#app form'); if (f) { f.scrollIntoView({ block: 'start' }); const i = f.querySelector('input,textarea'); if (i) i.focus(); } }
 });
@@ -551,8 +557,8 @@ document.addEventListener('scroll', e => {
 }, true);
 
 document.addEventListener('change', e => {
-  if (e.target.id !== 'ev-img') return;
-  const file = e.target.files[0], prev = $('ev-prev'); if (!file) return;
+  if (e.target.id !== 'ev-img' && e.target.id !== 'rs-img') return;
+  const pre = e.target.id.split('-')[0], file = e.target.files[0], prev = $(pre + '-prev'); if (!file) return;
   const fr = new FileReader();
   fr.onload = () => {
     const im = new Image();
@@ -561,8 +567,9 @@ document.addEventListener('change', e => {
       c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
       ui.img = c.toDataURL('image/jpeg', 0.72); prev.src = ui.img; prev.hidden = false;
+      const clear = document.querySelector('[data-a="img-clear"][data-v="' + pre + '"]'); if (clear) clear.hidden = false;
     };
-    im.onerror = () => { $('ev-err').textContent = 'Dieses Bild lässt sich nicht öffnen. Bitte wähle ein anderes.'; };
+    im.onerror = () => { $(pre + '-err').textContent = 'Dieses Bild lässt sich nicht öffnen. Bitte wähle ein anderes.'; };
     im.src = fr.result;
   };
   fr.readAsDataURL(file);
@@ -578,11 +585,11 @@ document.addEventListener('submit', async e => {
     catch (err) { $('lg-err').textContent = err.message; }
   }
   else if (id === 'pwform') await run('password', { old: $('pw-old').value, new: $('pw-new').value }, { ok: 'Neues Passwort gespeichert', err: 'pw-err', close: true });
-  else if (id === 'resform') await run('resSave', { id: editId, name: val('rs-name'), cat: val('rs-cat'), hint: val('rs-hint'), open: num('rs-open'), close: num('rs-close'), minH: num('rs-min'), maxH: num('rs-max'), dayOnly: on('rs-day'), aheadDays: num('rs-ahead'), repeat: on('rs-rep'), repeatMonths: num('rs-repm'), active: on('rs-active') }, { err: 'rs-err', close: true });
+  else if (id === 'resform') await run('resSave', { id: editId, name: val('rs-name'), cat: val('rs-cat'), hint: val('rs-hint'), open: num('rs-open'), close: num('rs-close'), minH: num('rs-min'), maxH: num('rs-max'), dayOnly: on('rs-day'), aheadDays: num('rs-ahead'), repeat: on('rs-rep'), repeatMonths: num('rs-repm'), active: on('rs-active'), img: ui.img }, { err: 'rs-err', close: true });
   else if (id === 'evform') await run('eventSave', { id: editId, title: val('ev-title'), date: val('ev-date'), from: num('ev-from'), to: num('ev-to'), all: on('ev-all'), res: val('ev-res'), desc: val('ev-desc'), img: ui.img }, { ok: 'Anlass gespeichert', err: 'ev-err', close: true });
   else if (id === 'postform') await run('postSave', { id: editId, title: val('po-title'), body: val('po-body'), important: on('po-imp') }, { ok: 'Mitteilung gespeichert', err: 'po-err', close: true });
   else if (id === 'userform') await run('userSave', { id: editId, name: val('us-name'), login: val('us-login'), role: val('us-role'), password: val('us-pw') }, { ok: 'Konto gespeichert', err: 'us-err', close: true });
-  else if (id === 'ctform') await run('settings', { email: val('ct-email'), whatsapp: val('ct-wa'), sender: val('ct-sender') }, { err: 'ct-err' });
+  else if (id === 'ctform') await run('settings', { email: val('ct-email'), sender: val('ct-sender') }, { err: 'ct-err' });
 });
 
 document.addEventListener('focusout', () => setTimeout(() => { if (ui.stale && !typing()) render(); }, 50));
